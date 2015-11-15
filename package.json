@@ -1,0 +1,24 @@
+{
+  "name": "flow-debug",
+  "version": "1.0.0",
+  "description": "flow debug Chrome Extension",
+  "main": "webpack.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "babel-core": "^6.1.2",
+    "babel-loader": "^6.0.1",
+    "babel-preset-es2015": "^6.1.2",
+    "css-loader": "^0.22.0",
+    "d3": "^3.5.6",
+    "file-loader": "^0.8.4",
+    "nflow": "0.0.3",
+    "purecss": "^0.6.0",
+    "style-loader": "^0.13.0",
+    "webpack": "^1.12.3",
+    "webpack-dev-server": "^1.12.1"
+  }
+}
