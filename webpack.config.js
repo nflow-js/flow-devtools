@@ -1,5 +1,5 @@
 var path = require('path');
-
+var ExtractTextPlugin = require("extract-text-webpack-plugin");
 var ROOT_PATH = path.resolve(__dirname);
 var APP_PATH = path.resolve(ROOT_PATH, 'src');
 var BUILD_PATH = path.resolve(ROOT_PATH, 'dist');
@@ -16,24 +16,22 @@ module.exports = {
   },
   output: {
     path: BUILD_PATH,
-    filename: '[name].js'
+    filename: '[name].js',
+    //libraryTarget: 'this'
   },
   module: {
+    noparse: [ /nflow-vis/ ],
     loaders: [
       {
-        test: /\.js?$/,
-        exclude: /node_modules/,
+        test: /\.js$/,
+        exclude: [/node_modules/ , /nflow-vis/],
         loader: 'babel?presets[]=es2015'
       },
-      {
-        test: /\.css$/,
-        loaders: ['style', 'css'],
-        include: APP_PATH
-      },
+      { test: /\.css$/, loader: ExtractTextPlugin.extract("style-loader", "css-loader") }  ,
       { test: /\.(html|json|png)/, loader: 'file?name=[name].[ext]' }
     ]
   },
   plugins: [
-    
+    new ExtractTextPlugin("panel.css"),
   ]
 };

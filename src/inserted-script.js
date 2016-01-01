@@ -7,5 +7,5 @@ var myExtension = {
 }
 document.addEventListener("FlowEvent", function(e) { myExtension.myListener(e); }, false);
 
-//console.log("Flow Listener added")
+console.log("Flow Listener added")
 //

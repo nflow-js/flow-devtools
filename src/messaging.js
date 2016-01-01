@@ -24,8 +24,8 @@ var port = chrome.extension.connect({
 
 // Listen to messages from the background page
 port.onMessage.addListener(function (message) {
-    state.handler(message)
     //console.log('got in devtools:', message)
+    state.handler(message)
   //document.querySelector('#insertmessagebutton').innerHTML = message.content;
   // port.postMessage(message);
 });

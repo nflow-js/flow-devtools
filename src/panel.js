@@ -3,24 +3,25 @@
 // Can use
 // chrome.devtools.*
 // chrome.extension.*
+import d3 from 'd3'
 import messaging from './messaging'
-import Tree from './components/tree'
+import {tree} from 'nflow-vis'
 
-var tree = Tree()
-  .dom(document.querySelector('#tree'))
+import 'nflow-vis/dist/nflow-vis.css'
+import './panel.css'
 
-resize()
+
+var dom = d3.select('#tree')
+
+var t = tree()
+  .dom(dom.node())
 
 messaging
-  .handler(tree.render)
+  .handler(render)
 
-d3.select(window)
-  .on('resize', resize)
-
-function resize(){
-  tree.width(document.body.clientWidth)
-  tree.height(document.body.clientHeight)
-  tree.update()
+function render(d){
+  var p = d.payload
+  t.render(d.action, p.flow, p.d, p.d0)
 }
 
 // document.querySelector('#executescript').addEventListener('click', function() {

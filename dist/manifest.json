@@ -1,0 +1,27 @@
+{
+    "name": "DevToolsPanel",
+    "version": "0.1",
+    "description": "flow debug chrome extension",
+    "devtools_page": "devtools.html",
+    "background": {
+        "scripts": [
+            "background.js"
+        ]
+    },
+    "content_scripts": [
+        {
+          "matches": [
+            "http://*/*",
+            "https://*/*"
+            ],
+          "run_at": "document_start",
+          "js": ["inserted-script.js"]
+        }
+      ],
+    "permissions": [
+        "tabs", 
+        "http://*/*",
+        "https://*/*"
+    ],
+    "manifest_version": 2
+}

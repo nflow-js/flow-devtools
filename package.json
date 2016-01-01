@@ -4,7 +4,8 @@
   "description": "flow debug Chrome Extension",
   "main": "webpack.config.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "webpack --watch"
   },
   "author": "",
   "license": "ISC",
@@ -20,5 +21,8 @@
     "style-loader": "^0.13.0",
     "webpack": "^1.12.3",
     "webpack-dev-server": "^1.12.1"
+  },
+  "dependencies": {
+    "extract-text-webpack-plugin": "^0.9.1"
   }
 }
