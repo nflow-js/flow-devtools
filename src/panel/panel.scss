@@ -1,0 +1,184 @@
+/*@import "~font-awesome/scss/font-awesome.scss";*/
+
+html, body {
+  margin:0;
+  box-sizing: border-box;
+}
+/*#tree {
+  width: 90vw;
+  height: 90vh;
+}
+*/
+/*.nflow-tree{
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}*/
+figure {
+  margin: 0;
+}
+
+.content > aside {
+  background-color: rgba(250,250,250,.9);
+  display: flex;
+  flex-direction: column;
+  overflow-y: scroll;
+
+  >header {
+    display: flex;
+    flex: 0 0 27px;
+    border-bottom: 1px solid #ccc;
+    overflow: visible;
+    background-color: #f3f3f3;
+    line-height: 27px;
+    padding: 0 5px;
+  }
+
+  >section{
+    white-space: nowrap;
+    
+
+    
+    >input{
+      display: none;
+      &:checked+label{
+        &:before{
+          content: "\f0da";
+          margin-left: -8px;
+        }
+        +*{
+          display: none;
+        }
+
+      }
+
+      +label{
+        
+        border-bottom: 1px solid #ccc;
+        overflow: visible;
+        background-color: #f3f3f3;
+        line-height: 27px;
+        padding: 0 5px;
+        padding: 0 15px;
+        display: block;
+        width: 100%;
+        
+        &:before{
+          font: normal normal normal 14px/1 FontAwesome;
+          font-size: inherit;
+          text-rendering: auto;
+          -webkit-font-smoothing: antialiased;
+          content: "\f0d7";
+          margin-left: -10px;
+          margin-top: 7px;
+          margin-right: 5px;
+        }
+
+        +*{
+          display: block;
+        }
+
+      }
+    }
+
+    dl{
+      font-size: 11px !important;
+      font-family: Menlo, monospace;
+
+      dt{
+        color: rgb(200, 0, 0);
+        padding-left: 10px;
+        float: left;
+        clear: left;
+        &:after{
+          content:":";
+          color: black;
+          margin-right: 5px;
+        }
+      }
+      dd {
+        padding-left: 15px;
+        white-space: normal;
+        margin: 0;
+      }
+
+    }
+  }
+
+}
+
+.content{
+  margin: 0;
+  height: calc(100% - 27px);
+  border: 1px dashed #dddddd;
+}
+
+footer {
+  position: absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  height:27px;
+  line-height: 27px;
+  padding-left: 0 5px;
+  background-color: rgba(250,250,250,.9);
+  border-top: 1px solid #ccc;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+
+  nav {
+    float: right;
+    padding-right: 10px;
+  }
+}
+
+.nodes{
+  overflow: hidden;
+  width:100%;
+}
+
+.content>*{
+  float:left;
+  height:100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.nflow-timeline{
+}
+
+.gutter {
+    background-color: transparent;
+    background-repeat: no-repeat;
+    background-position: 50%;
+    
+    &:hover{
+      background-color: rgba(250,250,250,.9);
+    }
+
+  &.gutter-horizontal {
+    cursor: col-resize;
+    border-right: 1px solid #ccc;
+
+    &:hover{
+      box-shadow: inset 0 1px 2px #e4e4e4;
+      background-image: url('../../node_modules/split.js/grips/vertical.png');
+    }
+  }
+  
+  &.gutter-vertical {
+    cursor: row-resize;
+    border-bottom: 1px solid #ccc;
+    margin-left: 8px;
+
+    &:hover{
+      box-shadow: inset 0 1px 2px #e4e4e4;
+      background-image: url('../../node_modules/split.js/grips/horizontal.png');
+    }
+  }
+} 
+
+.is-hidden {
+  display:none;
+}

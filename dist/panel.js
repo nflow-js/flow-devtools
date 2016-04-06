@@ -44,64 +44,161 @@
 /* 0 */
 /***/ function(module, exports, __webpack_require__) {
 
-	__webpack_require__(3);
-	module.exports = __webpack_require__(13);
+	__webpack_require__(6);
+	module.exports = __webpack_require__(63);
 
 
 /***/ },
 /* 1 */,
 /* 2 */,
-/* 3 */
+/* 3 */,
+/* 4 */,
+/* 5 */,
+/* 6 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var _d = __webpack_require__(4);
+	var _d = __webpack_require__(7);
 
 	var _d2 = _interopRequireDefault(_d);
 
-	var _messaging = __webpack_require__(5);
+	__webpack_require__(8);
 
-	var _messaging2 = _interopRequireDefault(_messaging);
+	__webpack_require__(12);
 
-	var _nflowVis = __webpack_require__(6);
+	__webpack_require__(20);
 
-	__webpack_require__(7);
+	var _comms = __webpack_require__(24);
 
-	__webpack_require__(11);
+	var _comms2 = _interopRequireDefault(_comms);
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	var _src = __webpack_require__(46);
+
+	var _split = __webpack_require__(61);
+
+	var _split2 = _interopRequireDefault(_split);
+
+	var _content = __webpack_require__(62);
+
+	var _content2 = _interopRequireDefault(_content);
 
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-	var dom = _d2.default.select('#tree'); // This one acts in the context of the panel in the Dev Tools
+	var comms = (0, _comms2.default)(); // This one acts in the context of the panel in the Dev Tools
 	//
 	// Can use
 	// chrome.devtools.*
 	// chrome.extension.*
 
-	var t = (0, _nflowVis.tree)().dom(dom.node());
+	var vis, tree, timeline;
 
-	_messaging2.default.handler(render);
+	var queue = [];
+	var maxQueueLength = 1;
 
-	function render(d) {
-	  var p = d.payload;
-	  t.render(d.action, p.flow, p.d, p.d0);
+	comms.onMessage(parseMessage);
+
+	function parseMessage(type, data) {
+	  //console.log('got message from background page', type, data)
+	  switch (type) {
+	    case 'messages':
+	      console.log('got some catchup messages:', data.length);
+	      data.forEach(function (d) {
+	        return parseMessage(d.type, d.data);
+	      });
+
+	      break;
+	    case 'init':
+	      console.log('init from content-page');
+	      reset();
+	      break;
+	    case 'nflow-log':
+	      var d = JSON.parse(data);
+	      queue.push(d);
+	      maxQueueLength = Math.max(maxQueueLength, queue.length);
+	      updateQueue();
+	      //console.log('visualising', d)
+
+	      break;
+	  }
 	}
 
-	// document.querySelector('#executescript').addEventListener('click', function() {
-	//     messaging.send({action: "code", content: "console.log('Inline script executed')"});
-	// }, false);
+	function updateQueue() {
+	  if (updateQueue.timer) return;
+	  var d3progress = _d2.default.select('footer>progress');
 
-	// document.querySelector('#insertscript').addEventListener('click', function() {
-	//     messaging.send({action: "script", content: "inserted-script.js"});
-	// }, false);
+	  updateQueue.timer = setInterval(function () {
 
-	// document.querySelector('#insertmessagebutton').addEventListener('click', function() {
-	//     messaging.send({action: "code", content: "document.body.innerHTML='<button>Send message to DevTools</button>'"});
-	//     messaging.send({action: "script", content: "messageback-script.js"});
-	// }, false);
+	    if (!queue.length) {
+	      maxQueueLength = 0;
+	      updateQueue.clear();
+	      return;
+	    }
+	    d3progress.classed('is-hidden', queue.length < 10).attr('max', maxQueueLength).attr('value', maxQueueLength - queue.length);
+
+	    var d = queue.shift();
+
+	    vis.emit('action', d.name, d.flow, d.d, d.d0);
+	  }, 1);
+	}
+
+	updateQueue.clear = function () {
+	  updateQueue.timer && clearInterval(updateQueue.timer);
+	  delete updateQueue.timer;
+	};
+
+	function reset() {
+	  queue = [];
+	  updateQueue.clear();
+	  _d2.default.select('.content').html(_content2.default);
+	  (0, _split2.default)(['.nodes', '.details'], {
+	    direction: 'horizontal',
+	    sizes: [75, 25],
+	    minSize: [10, 10],
+	    gutterSize: 8,
+	    cursor: 'column-resize',
+	    snapOffset: 10,
+	    onDrag: function onDrag() {
+	      return vis.emit('resize');
+	    }
+	  });
+
+	  (0, _split2.default)(['.nflow-tree', '.nflow-timeline'], {
+	    direction: 'vertical',
+	    sizes: [75, 25],
+	    minSize: [10, 10],
+	    snapOffset: 10,
+	    gutterSize: 8,
+	    cursor: 'row-resize',
+	    onDrag: function onDrag() {
+	      return vis.emit('resize');
+	    }
+	  });
+	  var d3timeline = _d2.default.select('.nflow-timeline');
+	  var d3tree = _d2.default.select('.nflow-tree');
+
+	  vis && vis.dispose();
+	  vis = _src.nflowVis.Vis();
+	  _d2.default.select(window).on('resize.tree', function () {
+	    return vis.emit('resize');
+	  });
+
+	  tree = _src.nflowVis.Tree(vis);
+	  tree.emit.downstream('dom', d3tree.node());
+	  tree.emit.downstream('show-events', false);
+
+	  timeline = _src.nflowVis.Timeline(vis);
+	  timeline.emit.downstream('dom', d3timeline.node());
+	}
+
+	reset();
 
 /***/ },
-/* 4 */
+/* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;!function() {
@@ -9659,625 +9756,2701 @@
 	}();
 
 /***/ },
-/* 5 */
+/* 8 */
+/***/ function(module, exports) {
+
+	// removed by extract-text-webpack-plugin
+
+/***/ },
+/* 9 */,
+/* 10 */,
+/* 11 */,
+/* 12 */
+/***/ function(module, exports) {
+
+	// removed by extract-text-webpack-plugin
+
+/***/ },
+/* 13 */,
+/* 14 */,
+/* 15 */,
+/* 16 */,
+/* 17 */,
+/* 18 */,
+/* 19 */,
+/* 20 */
+/***/ function(module, exports) {
+
+	// removed by extract-text-webpack-plugin
+
+/***/ },
+/* 21 */,
+/* 22 */,
+/* 23 */,
+/* 24 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	exports.default = function () {
+	  console.log('initialising nflow Devtols<->background comms');
+	  //var init = ()=>{}
+	  var onMessage = function onMessage() {};
+	  var api = {};
+
+	  var backgroundPageConnection = chrome.runtime.connect({
+	    name: "nflow"
+	  });
+
+	  backgroundPageConnection.onMessage.addListener(function (request, sender, sendResponse) {
+	    //console.log('comms incoming message', request)
+	    onMessage(request.type, request.data);
+	  });
+
+	  backgroundPageConnection.postMessage({
+	    name: 'init',
+	    tabId: chrome.devtools.inspectedWindow.tabId
+	  });
+
+	  function evalMessage(msg, handler) {
+	    chrome.devtools.inspectedWindow.eval(msg, function (result, isException) {
+	      handler && handler(result, isException);
+	      console.log('eval result:', result, isException);
+	    });
+	  }
+
+	  //api.onInit = f=>(f(), init=f, api)
+	  api.onMessage = function (f) {
+	    return onMessage = f, api;
+	  };
+	  api.eval = evalMessage;
+	  return api;
+	};
+
+/***/ },
+/* 25 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {'use strict';
+
+	var _nflow = __webpack_require__(26);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	if (global) global.nflow = _nflow2.default;
+	module.exports = _nflow2.default;
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 26 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _factory = __webpack_require__(27);
+
+	var _factory2 = _interopRequireDefault(_factory);
+
+	var _consts = __webpack_require__(30);
+
+	var _logger = __webpack_require__(32);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var root = (0, _factory2.default)(_consts.DEFAULTS, "flow");
+	_logger2.default.init(root);
+	exports.default = root;
+
+/***/ },
+/* 27 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _behaviours = __webpack_require__(28);
+
+	var behaviours = _interopRequireWildcard(_behaviours);
+
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+
+	exports.default = function (defaults, name, data) {
+	  var flow = defaults.factory();
+
+	  defaults.behaviours.forEach(function (d) {
+	    behaviours[d](flow, defaults, name, data);
+	  });
+	  return flow;
+	};
+
+/***/ },
+/* 28 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _cancellable = __webpack_require__(29);
+
+	Object.defineProperty(exports, 'cancellable', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_cancellable).default;
+	  }
+	});
+
+	var _connect = __webpack_require__(33);
+
+	Object.defineProperty(exports, 'connect', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_connect).default;
+	  }
+	});
+
+	var _create = __webpack_require__(34);
+
+	Object.defineProperty(exports, 'create', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_create).default;
+	  }
+	});
+
+	var _emit = __webpack_require__(35);
+
+	Object.defineProperty(exports, 'emit', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_emit).default;
+	  }
+	});
+
+	var _identify = __webpack_require__(41);
+
+	Object.defineProperty(exports, 'identify', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_identify).default;
+	  }
+	});
+
+	var _listen = __webpack_require__(42);
+
+	Object.defineProperty(exports, 'listen', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_listen).default;
+	  }
+	});
+
+	var _loggable = __webpack_require__(43);
+
+	Object.defineProperty(exports, 'loggable', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_loggable).default;
+	  }
+	});
+
+	var _stateful = __webpack_require__(44);
+
+	Object.defineProperty(exports, 'stateful', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_stateful).default;
+	  }
+	});
+
+	var _get = __webpack_require__(45);
+
+	Object.defineProperty(exports, 'get', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_get).default;
+	  }
+	});
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/***/ },
+/* 29 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _consts = __webpack_require__(30);
+
+	var _utils = __webpack_require__(31);
+
+	exports.default = function (flow, defaults, name) {
+
+	  flow.cancel = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidCancelArgs);
+	    flow.status.value = _consts.STATUS.CANCELLED;
+	    (0, _utils.dispatchInternalEvent)(flow, 'cancel', true);
+	    return flow;
+	  };
+
+	  flow.isCancelled = function () {
+	    return [flow].concat(flow.parents()).some(function (e) {
+	      return e.status.value == _consts.STATUS.CANCELLED || e.status.value == _consts.STATUS.DISPOSED;
+	    });
+	  };
+
+	  flow.stopPropagation = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidStopPropagationArgs);
+	    flow.status.value = _consts.STATUS.STOPPED;
+	    (0, _utils.dispatchInternalEvent)(flow, 'propagationStopped', true);
+	    return flow;
+	  };
+
+	  flow.propagationStopped = function () {
+	    return flow.status.value == _consts.STATUS.STOPPED;
+	  };
+	};
+
+/***/ },
+/* 30 */
 /***/ function(module, exports) {
 
 	"use strict";
 
 	Object.defineProperty(exports, "__esModule", {
-	    value: true
+	  value: true
 	});
-	// This creates and maintains the communication channel between
-	// the inspectedPage and the dev tools panel.
-	//
-	// In this example, messages are JSON objects
-	// {
-	//   action: ['code'|'script'|'message'], // What action to perform on the inspected page
-	//   content: [String|Path to script|Object], // data to be passed through
-	//   tabId: [Automatically added]
-	// }
+	/**
+	 *  consts
+	 */
 
-	var api = {};
-	var state = {};
-
-	api.handler = function (handler) {
-	    return state.handler = handler, api;
+	var UNSET = exports.UNSET = {};
+	var DIRECTION = exports.DIRECTION = {
+	  NONE: "NONE",
+	  DEFAULT: "DEFAULT",
+	  UPSTREAM: "UPSTREAM",
+	  DOWNSTREAM: "DOWNSTREAM"
 	};
-	api.send = function (message) {
-	    message.tabId = chrome.devtools.inspectedWindow.tabId;
-	    chrome.extension.sendMessage(message);
+
+	var STATUS = exports.STATUS = {
+	  IDLE: "IDLE",
+	  FLOWING: "FLOWING",
+	  STOPPED: "STOPPED",
+	  COMPLETED: "COMPLETED",
+	  CANCELLED: "CANCELLED",
+	  DISPOSED: "DISPOSED"
 	};
-	//Create a port with background page for continous message communication
-	var port = chrome.extension.connect({
-	    name: "Sample Communication" //Given a Name
-	});
 
-	// Listen to messages from the background page
-	port.onMessage.addListener(function (message) {
-	    //console.log('got in devtools:', message)
-	    state.handler(message);
-	    //document.querySelector('#insertmessagebutton').innerHTML = message.content;
-	    // port.postMessage(message);
-	});
-
-	// This sends an object to the background page
-	// where it can be relayed to the inspected page
-	exports.default = api;
+	var DEFAULTS = exports.DEFAULTS = {
+	  factory: function factory() {
+	    return {};
+	  },
+	  behaviours: ['identify', 'stateful', 'connect', 'create', 'emit', 'listen', 'cancellable', 'loggable'],
+	  direction: DIRECTION.DEFAULT
+	};
+	var ERRORS = exports.ERRORS = {
+	  invalidGuid: 'Invalid Argument. Guid-s are immutable. Please use the .name() API to change the name of a flow object.',
+	  invalidChildren: 'Invalid Argument. Please use child.parent(parent) to re-parent flow objects.',
+	  invalidListener: 'Invalid Arguments. Please use .on("foo", handler) to create a listener.',
+	  invalidListenerType: 'Invalid Listener function. Expected a function, got: %s',
+	  invalidEventName: 'Invalid Arguments. Please use .emit("foo", payload) to emit a flow event.',
+	  invalidName: 'Invalid flow Name. Expected a String value, got: %s',
+	  invalidParent: 'Invalid flow parent object. Expected a flow instance, got: %s',
+	  invalidParents: 'Invalid Argument. Please use the child.parent(parent) API to re-parent flow objects.',
+	  invalidStatus: 'Invalid Argument. The .status() API is read only',
+	  invalidDisposeArgs: 'Invalid Argument. The .dispose() API requires no parameters',
+	  invalidCancelArgs: 'Invalid Argument. The .cancel() API requires no parameters',
+	  invalidStopPropagationArgs: 'Invalid Argument. The .stopPropagation() API requires no parameters',
+	  invalidRoot: 'Invalid Argument. The .parents.root() API is read only'
+	};
 
 /***/ },
-/* 6 */
+/* 31 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	exports.assert = assert;
+	exports.isFlow = isFlow;
+	exports.isInternal = isInternal;
+	exports.detach = detach;
+	exports.isDetached = isDetached;
+	exports.flatten = flatten;
+	exports.merge = merge;
+	exports.dispatchInternalEvent = dispatchInternalEvent;
+
+	var _factory = __webpack_require__(27);
+
+	var _factory2 = _interopRequireDefault(_factory);
+
+	var _consts = __webpack_require__(30);
+
+	var _logger = __webpack_require__(32);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	/**
+	 *  utils
+	 */
+	function assert(condition, error, val) {
+	  if (condition) {
+	    throw new Error(error.replace("%s", val));
+	  }
+	  return condition;
+	}
+
+	function isFlow(flow) {
+	  return flow && flow.name && flow.name.isFlow;
+	}
+
+	function isInternal(flow) {
+	  return flow && flow.name && flow.name.isInternal;
+	}
+
+	function detach(flow) {
+	  flow.parent() && flow.parent().children.detach(flow);
+	}
+
+	function isDetached(flow) {
+	  return !flow.parent() || !flow.parent().children.has(flow);
+	}
+
+	function flatten(array) {
+	  return [].concat.apply([], array);
+	}
+
+	function merge(source, target) {
+	  Object.keys(source).forEach(function (key) {
+	    target[key] = source[key];
+	  });
+	}
+
+	function dispatchInternalEvent(flow, name, newData, oldData) {
+	  var e = (0, _factory2.default)(_consts.DEFAULTS, "flow." + name);
+	  e.name.isInternal = true;
+	  e.data.value = [newData, oldData];
+	  e.direction.value = _consts.DIRECTION.NONE;
+	  e.parent.value = flow;
+	  e.emit();
+	  e.data.value = [flow, newData, oldData];
+	  e.direction.value = _consts.DIRECTION.UPSTREAM;
+	  e.name.value = "flow.children." + name;
+	  e.emit();
+
+	  e.direction.value = _consts.DIRECTION.DOWNSTREAM;
+	  e.name.value = "flow.parent." + name;
+	  e.emit();
+
+	  _logger2.default.log(flow, name, newData, oldData);
+	}
+
+/***/ },
+/* 32 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _utils = __webpack_require__(31);
+
+	var _consts = __webpack_require__(30);
+
+	var _factory = __webpack_require__(27);
+
+	var _factory2 = _interopRequireDefault(_factory);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var loggers = [];
+
+	function log(flow, name, newData, oldData) {
+	  if (!(0, _utils.isInternal)(flow)) {
+	    loggers.forEach(function (f) {
+	      return f(flow, name, newData, oldData);
+	    });
+	    debug(flow, name, newData, oldData);
+	  }
+	}
+
+	function debug(flow, name, d, d0) {
+	  global.__nflow_devtools_hook__ && global.__nflow_devtools_hook__({
+	    flow: flow.toObj(),
+	    name: name,
+	    d: d && (d.toObj ? d.toObj() : d),
+	    d0: d0 && (d0.toObj ? d0.toObj() : d0)
+	  });
+	}
+
+	function init(flow) {
+
+	  flow.enableDevTools = function () {
+	    var enabled = arguments.length <= 0 || arguments[0] === undefined ? true : arguments[0];
+
+	    debug(flow, 'start', flow, flow);
+
+	    console.warn('flow.enableDevtools() is now deprecated. nflow-devtools will automatically start logging when Chrome devtools is open');
+	    return flow;
+	  };
+
+	  flow.logger = function () {
+	    var logger = arguments.length <= 0 || arguments[0] === undefined ? _consts.UNSET : arguments[0];
+
+	    if (logger === _consts.UNSET) return loggers;
+	    loggers.push(logger);
+	    return flow;
+	  };
+	}
+
+	exports.default = {
+	  init: init,
+	  log: log
+	};
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 33 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _utils = __webpack_require__(31);
+
+	var _consts = __webpack_require__(30);
+
+	exports.default = function (flow) {
+
+	  /**
+	   *  .children() API
+	   */
+	  flow.children = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidChildren);
+	    return flow.children.value.concat();
+	  };
+	  flow.children.value = [];
+
+	  flow.children.has = function (matcher, recursive) {
+	    return flow.children.find(matcher, recursive) != null;
+	  };
+	  flow.children.find = function (matcher, recursive) {
+	    return flow.children.findAll(matcher, recursive).pop();
+	  };
+	  flow.children.findAll = function (matcher, recursive) {
+
+	    var filter = matcher;
+	    if (matcher == null) return [];
+	    if (typeof matcher == "string") filter = function filter(f) {
+	      return f.name() == matcher;
+	    };else if ((0, _utils.isFlow)(matcher)) filter = function filter(f) {
+	      return f == matcher;
+	    };
+	    var children = recursive ? flow.children.all() : flow.children();
+
+	    return children.filter(filter);
+	  };
+
+	  flow.get = flow.children.find;
+	  flow.getAll = flow.children.find;
+
+	  /**
+	   *  return all children recursively
+	   */
+	  flow.children.all = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidChildren);
+	    var childMap = {};
+	    return getChildren(flow);
+
+	    function getChildren(flow) {
+	      if (childMap[flow.guid()]) return [];
+	      childMap[flow.guid()] = true;
+	      var c = flow.children.value;
+	      var gc = flow.children.value.map(getChildren);
+
+	      return c.concat.apply(c, gc);
+	    }
+	  };
+
+	  /**
+	   *  .parent() API
+	   */
+	  flow.parent = function () {
+	    if (!arguments.length) return flow.parent.value;
+	    var parent = arguments.length <= 0 ? undefined : arguments[0];
+	    parent && (0, _utils.assert)(!(0, _utils.isFlow)(parent), _consts.ERRORS.invalidParent, parent);
+	    var previousParent = flow.parent();
+	    (0, _utils.detach)(flow);
+	    (0, _utils.dispatchInternalEvent)(flow, 'childRemoved', previousParent);
+	    attach(parent);
+	    (0, _utils.dispatchInternalEvent)(flow, 'childAdded', parent, previousParent);
+	    return flow;
+	  };
+
+	  flow.parents = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidParents);
+	    var parentMap = {};
+	    var parents = [];
+	    var p = flow.parent();
+	    while (p && !parentMap[p.guid()]) {
+	      parents.push(p);
+	      parentMap[p.guid()] = true;
+	      p = p.parent();
+	    }
+	    return parents;
+	  };
+
+	  flow.parents.find = function (matcher) {
+	    if (matcher == null) return null;
+	    var filter = matcher;
+	    if (typeof matcher == "string") filter = function filter(f) {
+	      return f.name() == matcher;
+	    };else if ((0, _utils.isFlow)(matcher)) filter = function filter(f) {
+	      return f == matcher;
+	    };
+
+	    return flow.parents().filter(filter).pop();
+	  };
+	  flow.parents.has = function (matcher) {
+	    return !!flow.parents.find(matcher);
+	  };
+
+	  flow.parents.root = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidRoot);
+	    return flow.parents().pop();
+	  };
+
+	  flow.children.detach = function (child) {
+	    flow.children.value = flow.children.value.filter(function (f) {
+	      return f != child;
+	    });
+	  };
+
+	  function attach(parent) {
+	    parent && parent.children.value.push(flow);
+	    flow.parent.value = parent;
+	  }
+	};
+
+/***/ },
+/* 34 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _factory = __webpack_require__(27);
+
+	var _factory2 = _interopRequireDefault(_factory);
+
+	var _logger = __webpack_require__(32);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	var _utils = __webpack_require__(31);
+
+	var _consts = __webpack_require__(30);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (flow, defaults) {
+
+	  flow.create = function (name) {
+	    for (var _len = arguments.length, data = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+	      data[_key - 1] = arguments[_key];
+	    }
+
+	    var instance = (0, _factory2.default)(flow.create.defaults, name, data);
+	    instance.parent.value = flow;
+	    flow.children.value.push(instance);
+	    (0, _utils.dispatchInternalEvent)(flow, 'create', instance);
+	    return instance;
+	  };
+
+	  flow.create.defaults = {
+	    factory: defaults.factory,
+	    behaviours: defaults.behaviours.concat(),
+	    direction: defaults.direction
+
+	  };
+
+	  flow.dispose = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidDisposeArgs);
+	    if (flow.status.value == _consts.STATUS.DISPOSED) return;
+
+	    (0, _utils.dispatchInternalEvent)(flow, 'dispose', true);
+	    flow.parent(null);
+	    flow.status.value = _consts.STATUS.DISPOSED;
+	    flow.on.listenerMap = {};
+
+	    //recursively dispose all downstream nodes
+	    flow.children().forEach(function (f) {
+	      return f.dispose();
+	    });
+	    return flow;
+	  };
+	};
+
+/***/ },
+/* 35 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _consts = __webpack_require__(30);
+
+	var _utils = __webpack_require__(31);
+
+	var _logger = __webpack_require__(32);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	var _routes = __webpack_require__(36);
+
+	var routes = _interopRequireWildcard(_routes);
+
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
+	var log = _logger2.default.log;
+
+	exports.default = function (flow) {
+
+	  flow.status = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidStatus);
+	    return flow.status.value;
+	  };
+	  flow.status.value = _consts.STATUS.IDLE;
+	  (0, _utils.merge)(_consts.STATUS, flow.status);
+
+	  flow.direction = function () {
+	    var direction = arguments.length <= 0 || arguments[0] === undefined ? _consts.UNSET : arguments[0];
+
+	    if (direction === _consts.UNSET) return flow.direction.value;
+	    flow.direction.value = direction;
+	    return flow;
+	  };
+	  flow.direction.value = flow.create.defaults.direction;
+	  (0, _utils.merge)(_consts.DIRECTION, flow.direction);
+
+	  flow.emit = function () {
+	    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+	      args[_key - 1] = arguments[_key];
+	    }
+
+	    var name = arguments.length <= 0 || arguments[0] === undefined ? _consts.UNSET : arguments[0];
+
+	    return emit(name, args);
+	  };
+	  createEmitAPI(flow);
+
+	  function emit() {
+	    var name = arguments.length <= 0 || arguments[0] === undefined ? _consts.UNSET : arguments[0];
+	    var args = arguments[1];
+	    var direction = arguments[2];
+
+	    if (name == _consts.UNSET) {
+	      // emit current flow object
+	      (0, _utils.detach)(flow);
+	      direction && flow.direction(direction);
+	      log(flow, 'emit', flow);
+	      flow.emit.route(flow);
+	      log(flow, 'emitted', flow);
+	      return flow;
+	    }
+	    if ((0, _utils.isFlow)(name)) {
+	      //1. reparent the passed in flow object where it's emitted from
+	      name.parent(flow);
+	      //2.  emit the passed in flow object
+	      (0, _utils.detach)(name);
+	      direction && name.direction(direction);
+	      log(name, 'emit', name);
+	      flow.emit.route(name);
+	      log(name, 'emitted', name);
+	      return flow;
+	    }
+
+	    (0, _utils.assert)(typeof name != 'string', _consts.ERRORS.invalidEventName);
+
+	    var event = flow.create.apply(flow, [name].concat(_toConsumableArray(args)));
+	    (0, _utils.detach)(event);
+	    direction && event.direction(direction);
+	    log(event, 'emit', event);
+	    flow.emit.route(event);
+	    log(event, 'emitted', event);
+	    return event;
+	  }
+
+	  flow.emit.route = function (flow) {
+	    // 2. reset status
+	    flow.emit.recipients = [];
+	    flow.emit.recipientsMap = {};
+
+	    flow.status.value = _consts.STATUS.FLOWING;
+
+	    // only keep unique recipients
+	    flow.emit.targets = flow.emit.route[flow.direction()](flow).filter(function (f) {
+	      if (flow.emit.recipientsMap[f.flow.guid()]) return false;
+	      return flow.emit.recipientsMap[f.flow.guid()] = true;
+	    });
+
+	    while (flow.emit.targets.length) {
+	      var destination = flow.emit.targets.shift();
+	      if (flow.isCancelled()) break;
+	      if (flow.propagationStopped()) break;
+	      if (destination.flow.isCancelled()) continue;
+	      notify(flow, destination);
+	    }
+	  };
+
+	  flow.emit.route.DOWNSTREAM = routes.downstream;
+	  flow.emit.route.UPSTREAM = routes.upstream;
+	  flow.emit.route.DEFAULT = routes.default;
+	  flow.emit.route.NONE = routes.none;
+
+	  function notify(flow, currentNode) {
+	    if (currentNode.flow.on.notifyListeners(flow)) {
+	      flow.emit.recipientsMap[currentNode.flow.guid()] = flow.direction();
+	      flow.emit.recipients.push(currentNode);
+	    }
+	  }
+
+	  /** 
+	   *  create directional (eg. `flow.emit.dowsntream(...)`) API
+	   */
+	  function createEmitAPI(flow) {
+	    Object.keys(_consts.DIRECTION).forEach(function (direction) {
+	      flow.emit[direction] = flow.emit[direction.toLowerCase()] = function (name) {
+	        for (var _len2 = arguments.length, args = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
+	          args[_key2 - 1] = arguments[_key2];
+	        }
+
+	        return emit(name, args, direction);
+	      };
+	    });
+	  }
+	};
+
+/***/ },
+/* 36 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _upstream = __webpack_require__(37);
+
+	Object.defineProperty(exports, 'upstream', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_upstream).default;
+	  }
+	});
+
+	var _none = __webpack_require__(38);
+
+	Object.defineProperty(exports, 'none', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_none).default;
+	  }
+	});
+
+	var _downstream = __webpack_require__(39);
+
+	Object.defineProperty(exports, 'downstream', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_downstream).default;
+	  }
+	});
+
+	var _default = __webpack_require__(40);
+
+	Object.defineProperty(exports, 'default', {
+	  enumerable: true,
+	  get: function get() {
+	    return _interopRequireDefault(_default).default;
+	  }
+	});
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/***/ },
+/* 37 */
 /***/ function(module, exports) {
 
-	(function(e, a) { for(var i in a) e[i] = a[i]; }(this, /******/ (function(modules) { // webpackBootstrap
-	/******/ 	// The module cache
-	/******/ 	var installedModules = {};
-	/******/
-	/******/ 	// The require function
-	/******/ 	function __webpack_require__(moduleId) {
-	/******/
-	/******/ 		// Check if module is in cache
-	/******/ 		if(installedModules[moduleId])
-	/******/ 			return installedModules[moduleId].exports;
-	/******/
-	/******/ 		// Create a new module (and put it into the cache)
-	/******/ 		var module = installedModules[moduleId] = {
-	/******/ 			exports: {},
-	/******/ 			id: moduleId,
-	/******/ 			loaded: false
-	/******/ 		};
-	/******/
-	/******/ 		// Execute the module function
-	/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-	/******/
-	/******/ 		// Flag the module as loaded
-	/******/ 		module.loaded = true;
-	/******/
-	/******/ 		// Return the exports of the module
-	/******/ 		return module.exports;
-	/******/ 	}
-	/******/
-	/******/
-	/******/ 	// expose the modules object (__webpack_modules__)
-	/******/ 	__webpack_require__.m = modules;
-	/******/
-	/******/ 	// expose the module cache
-	/******/ 	__webpack_require__.c = installedModules;
-	/******/
-	/******/ 	// __webpack_public_path__
-	/******/ 	__webpack_require__.p = "http://localhost:4000/dist/";
-	/******/
-	/******/ 	// Load entry module and return exports
-	/******/ 	return __webpack_require__(0);
-	/******/ })
-	/************************************************************************/
-	/******/ ([
-	/* 0 */
-	/***/ function(module, exports, __webpack_require__) {
+	"use strict";
 
-		'use strict';
-		
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		exports.tree = undefined;
-		
-		var _tree = __webpack_require__(1);
-		
-		var _tree2 = _interopRequireDefault(_tree);
-		
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-		
-		var tree = exports.tree = _tree2.default;
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	/**
+	 *  returns: all parent nodes
+	 */
 
-	/***/ },
-	/* 1 */
-	/***/ function(module, exports, __webpack_require__) {
-
-		'use strict';
-		
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		
-		__webpack_require__(2);
-		
-		var _nodes = __webpack_require__(6);
-		
-		var _nodes2 = _interopRequireDefault(_nodes);
-		
-		var _links = __webpack_require__(9);
-		
-		var _links2 = _interopRequireDefault(_links);
-		
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-		
-		//import d3 from "d3"
-		
-		var actions = {};
-		
-		exports.default = tree;
-		
-		function tree() {
-		
-		  var instance = {},
-		      state = {};
-		
-		  instance.dom = function (dom) {
-		    return state.dom = dom, instance;
-		  };
-		  instance.flow = function (flow) {
-		    return state.flow = flow, track(flow, state), instance;
-		  };
-		  instance.render = function () {
-		    for (var _len = arguments.length, data = Array(_len), _key = 0; _key < _len; _key++) {
-		      data[_key] = arguments[_key];
-		    }
-		
-		    return render.apply(undefined, [state].concat(data));
-		  };
-		
-		  return instance;
-		}
-		
-		function track(f, s) {
-		  render(s, 'start', toObj(f), null, null);
-		  nflow.logger(function (flow, name, newData, oldData) {
-		    render(s, name, toObj(flow), toObj(newData), toObj(oldData));
-		  });
-		}
-		
-		function toObj(d) {
-		  return d && d.name && d.name.isFlow ? d.toObj() : d;
-		}
-		
-		function render(s, name) {
-		  if (!s.d3dom) init(s);
-		  //console.log('action', name, data)
-		
-		  for (var _len2 = arguments.length, data = Array(_len2 > 2 ? _len2 - 2 : 0), _key2 = 2; _key2 < _len2; _key2++) {
-		    data[_key2 - 2] = arguments[_key2];
-		  }
-		
-		  actions[name] && actions[name].apply(actions, [s].concat(data));
-		  resizeSvg(s);
-		
-		  s.nodes = s.tree.nodes(s.root).reverse(), s.links = s.tree.links(s.nodes);
-		
-		  //Normalize for fixed-depth.
-		  s.nodes.forEach(function (d) {
-		    d.y = d.depth * 60;
-		  });
-		
-		  s.render();
-		}
-		
-		function init(s) {
-		  s.nodeMap = {};
-		  s.tree = d3.layout.tree();
-		
-		  //s.tree.nodeSize(function(d){ return [60,90]})
-		  //s.tree.separation((a,b)=>Math.min(1,b.name.length))
-		  s.diagonal = d3.svg.diagonal();
-		  s.d3dom = d3.select(s.dom);
-		  s.width = parseInt(s.d3dom.style('width'));
-		  s.height = parseInt(s.d3dom.style('height'));
-		  s.svg = s.d3dom.html("").append("svg");
-		
-		  s.d3g = s.svg.append('g').call(d3.behavior.zoom().scaleExtent([.2, 8]).on("zoom", zoom)).append('g');
-		
-		  s.d3g.append("rect").attr("class", "overlay").attr("width", s.width).attr("height", s.height);
-		
-		  s.d3links = s.d3g.append("g");
-		  s.d3routes = s.d3g.append("g").classed('routes', true);
-		  s.d3nodes = s.d3g.append("g");
-		  s.margin = { top: 20, right: 40, bottom: 20, left: 20 };
-		  s.delay = 0;
-		  s.duration = 600;
-		  s.nodes = [];
-		  s.links = [];
-		  s.showRoute = null;
-		  s.d3g.attr("transform", "translate(" + s.margin.left + "," + s.margin.top + ")");
-		
-		  s.diagonal.projection(function (d) {
-		    return [d.x, d.y];
-		  });
-		
-		  s.render = function () {
-		
-		    (0, _nodes2.default)(s);
-		    (0, _links2.default)(s);
-		  };
-		
-		  function zoom() {
-		    s.d3g.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-		  }
-		}
-		
-		actions.listenerAdded = actions.listenerRemoved = function (s, f, newData, oldData) {
-		  var e = s.nodeMap[f.guid];
-		  if (!e) return;
-		  e.source = f;
-		};
-		
-		actions.start = function (s, f, newData, oldData) {
-		  s.root = {
-		    name: f.name,
-		    id: f.guid,
-		    parent: null,
-		    children: [],
-		    isNew: true,
-		    numInstances: 1,
-		    source: f
-		  };
-		  s.nodeMap[s.root.id] = s.root;
-		};
-		
-		actions.create = function (s, f, newData, oldData) {
-		  var p = s.nodeMap[f.guid];
-		  if (!p) return;
-		  p.children = p.children || [];
-		  var existingNode = p.children.filter(function (c) {
-		    return c.name == newData.name;
-		  }).pop();
-		
-		  s.nodeMap[newData.guid] = {
-		    name: newData.name,
-		    id: newData.guid,
-		    children: [],
-		    isNew: true,
-		    numInstances: 1,
-		    x0: p.x0,
-		    y0: p.y0,
-		    source: newData
-		  };
-		
-		  if (existingNode) {
-		    removeNode(existingNode, s);
-		    s.nodeMap[newData.guid].numInstances += existingNode.numInstances;
-		    s.nodeMap[newData.guid].isNew = false;
-		  }
-		
-		  p.children.push(s.nodeMap[newData.guid]);
-		};
-		
-		actions.emit = function (s, f, newData, oldData) {
-		  var e = s.nodeMap[f.guid];
-		  if (!e) return;
-		  e.source = f;
-		  e.isFlow = true;
-		};
-		actions.emitted = function (s, f, newData, oldData) {
-		  var e = s.nodeMap[f.guid];
-		  if (!e) return;
-		  e.source = f;
-		};
-		
-		actions.cancel = function (s, f, newData, oldData) {
-		  var e = s.nodeMap[f.guid];
-		  if (!e) return;
-		  e.source = f;
-		};
-		
-		actions.childRemoved = function (s, f, oldParent) {
-		  var e = s.nodeMap[f.guid];
-		  if (!e) return;
-		  e.isRemoved = true;
-		};
-		
-		actions.childAdded = function (s, f, newParent, oldParent) {
-		  var e = s.nodeMap[f.guid];
-		  if (!e) return;
-		  e.isRemoved = newParent == null;
-		
-		  // remove child from old parent
-		  var oldP = oldParent && s.nodeMap[oldParent.guid];
-		  if (oldP && newParent) oldP.children = oldP.children.filter(function (n) {
-		    return n.id != f.guid;
-		  });
-		
-		  // add to new parent
-		  var newP = newParent && s.nodeMap[newParent.guid];
-		  if (newP) {
-		    newP.children = newP.children || [];
-		    newP.children.push(e);
-		  }
-		};
-		
-		function removeNode(d, s) {
-		  d.childen && d.children.forEach(function (n) {
-		    return removeNode(n, s);
-		  });
-		  if (d.parent) d.parent.children = d.parent.children.filter(function (n) {
-		    return n.id != d.id;
-		  });
-		  delete s.nodeMap[d.id];
-		}
-		
-		function resizeSvg(s) {
-		  var width = s.width - s.margin.right - s.margin.left,
-		      height = s.height - s.margin.top - s.margin.bottom;
-		  s.tree.size([width, height]);
-		  s.root.x0 = s.root.x = width / 2 + s.margin.left;
-		  s.root.y0 = s.root.y = 0;
-		
-		  s.svg.attr("width", s.width).attr("height", s.height);
-		}
-
-	/***/ },
-	/* 2 */
-	/***/ function(module, exports) {
-
-		// removed by extract-text-webpack-plugin
-
-	/***/ },
-	/* 3 */,
-	/* 4 */,
-	/* 5 */,
-	/* 6 */
-	/***/ function(module, exports, __webpack_require__) {
-
-		'use strict';
-		
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		exports.default = renderNodes;
-		
-		var _paths = __webpack_require__(7);
-		
-		var _utils = __webpack_require__(8);
-		
-		var _utils2 = _interopRequireDefault(_utils);
-		
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-		
-		function renderNodes(s) {
-		  // Update the nodes…
-		  var node = s.d3nodes.selectAll("g.node").data(s.nodes, function (d) {
-		    return d.id;
-		  });
-		
-		  var nodeEnter = node.enter().append("g").attr("class", "node").attr("transform", function (d) {
-		    return "translate(" + d.x0 + "," + d.y0 + ")";
-		  }).on("mouseover", function (d) {
-		    return mouseover(s, d);
-		  }).on("mouseout", function (d) {
-		    return mouseout(s, d);
-		  });
-		
-		  nodeEnter.append('path').attr("transform", "scale(.8)").attr("d", _paths.CIRCLE);
-		
-		  nodeEnter.append('g').classed('listeners', true);
-		
-		  nodeEnter.append("text").attr("x", _paths.RADIUS + 4).attr("dy", ".35em").attr("text-anchor", function (d) {
-		    return d.children || d._children ? "end" : "start";
-		  }).style("fill-opacity", .1);
-		
-		  // Transition nodes to their new position.
-		  var nodeUpdate = node.transition().duration(s.duration).delay(function (d) {
-		    return d.isNew ? s.delay : 0;
-		  }).attr("transform", function (d) {
-		    return "translate(" + d.x + "," + d.y + ")";
-		  }).each("end", function (d) {
-		    d.x0 = d.x;
-		    d.y0 = d.y;
-		    delete d.isNew;
-		  });
-		
-		  node.select('path').classed('is-flow', function (d) {
-		    return d.isFlow;
-		  });
-		
-		  node.classed('is-cancelled', function (d) {
-		    return d.source.status == 'CANCELLED';
-		  }).classed('is-parent-cancelled', function (d) {
-		    return _utils2.default.parentCancelled(d);
-		  }).classed('is-recipient', function (d) {
-		    return _utils2.default.isRecipient(d, s);
-		  }).classed('has-no-recipients', function (d) {
-		    return _utils2.default.hasNoRecipients(d);
-		  });
-		
-		  node.call(listeners);
-		
-		  nodeUpdate.select("path").attr('d', function (d) {
-		    return d.isFlow ? _paths.DROP : _paths.CIRCLE;
-		  });
-		
-		  nodeUpdate.select("text").text(function (d) {
-		    return (d.numInstances > 1 ? d.numInstances + 'x ' : '') + d.name;
-		  }).style("fill-opacity", 1);
-		
-		  // Transition exiting nodes to the parent's new position.
-		  var nodeExit = node.exit().remove();
-		
-		  showRoute(s);
-		}
-		
-		function listeners(sel) {
-		  var R = 2;
-		
-		  var e = sel.select('.listeners').selectAll('.listener').data(function (d) {
-		    return d.source.listeners;
-		  });
-		
-		  e.enter().append('circle').classed('listener', true).attr("cx", _paths.RADIUS + R).attr("cy", function (d, i) {
-		    return _paths.RADIUS + i * (R + .5) * 2;
-		  }).attr("r", R).attr('title', String);
-		}
-		
-		function mouseover(s, d) {
-		  s.showRoute = d;
-		  s.render();
-		}
-		
-		function mouseout(s, d) {
-		  s.showRoute = null;
-		  s.render();
-		}
-		
-		function showRoute(s) {
-		  if (!s.showRoute || !s.showRoute.source.recipients) {
-		    s.d3routes.html('');
-		    return;
-		  };
-		  var line = d3.svg.line().x(function (d) {
-		    return d.x;
-		  }).y(function (d) {
-		    return d.y;
-		  }).interpolate('linear');
-		
-		  var paths = s.d3routes.selectAll("g.route").data(s.showRoute.source.recipients, function (d) {
-		    return d.flow.guid;
-		  });
-		
-		  paths.enter().append('g').classed('route', true);
-		
-		  //paths.attr("transform", (d,i)=>
-		  //  "translate(" + (i*3) + ",0)");
-		
-		  var links = paths.selectAll('path.link').data(function (d) {
-		    var r = d.route.concat();
-		    var pairs = [];
-		    while (r.length > 1) {
-		
-		      pairs.push({
-		        source: s.nodeMap[r[0].guid],
-		        target: s.nodeMap[r[1].guid] });
-		      r.shift();
-		    }
-		    return pairs;
-		  });
-		
-		  links.enter().insert("path", "g").attr("class", "link");
-		
-		  links.attr("d", function (d) {
-		    var upstream = d.source.y > d.target.y;
-		
-		    return s.diagonal({
-		      source: { x: d.source.x, y: d.source.y },
-		      target: { x: d.target.x, y: d.target.y }
-		    });
-		  });
-		}
-
-	/***/ },
-	/* 7 */
-	/***/ function(module, exports) {
-
-		'use strict';
-		
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		var CIRCLE = exports.CIRCLE = 'm-12.50001,0.54385c0,-7.20655 5.8373,-13.04385 13.04385,-13.04385c7.20655,0 13.04385,5.8373 13.04385,13.04385c0,7.20655 -5.8373,13.04385 -13.04385,13.04385c-7.20655,0 -13.04385,-5.8373 -13.04385,-13.04385z';
-		var DROP = exports.DROP = 'm9.72864,6.18447c0,5.21228 -4.34827,9.44253 -9.70596,9.44253c-5.35769,0 -9.80507,-4.2312 -9.70595,-9.44253c0.1317,-6.99036 5.4678,-9.83766 9.70595,-17.87197c4.50158,7.77089 9.70596,12.65969 9.70596,17.87197z';
-		var RADIUS = exports.RADIUS = 10.4;
-
-	/***/ },
-	/* 8 */
-	/***/ function(module, exports) {
-
-		'use strict';
-		
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		var utils = {};
-		
-		utils.parentCancelled = function (node) {
-		  if (!node) return false;
-		  return node.source.status == 'CANCELLED' || utils.parentCancelled(node.parent);
-		};
-		
-		utils.hasNoRecipients = function (node) {
-		  return node.source.recipients && node.source.recipients.length == 0;
-		};
-		
-		utils.isRecipient = function (node, s) {
-		  if (!node || !s.showRoute || !s.showRoute.source.recipients) return false;
-		
-		  return s.showRoute.source.recipients.some(function (f) {
-		    return f.flow.guid == node.id;
-		  });
-		};
-		
-		exports.default = utils;
-
-	/***/ },
-	/* 9 */
-	/***/ function(module, exports, __webpack_require__) {
-
-		'use strict';
-		
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		exports.default = renderLinks;
-		
-		var _paths = __webpack_require__(7);
-		
-		var _utils = __webpack_require__(8);
-		
-		var _utils2 = _interopRequireDefault(_utils);
-		
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-		
-		function renderLinks(s) {
-		  // Update the links
-		  var link = s.d3links.selectAll("path.link").data(s.links, function (d) {
-		    return d.target.id;
-		  });
-		  // Enter any new links at the parent's previous position.
-		  link.enter().insert("path", "g").attr("class", "link").attr("d", function (d) {
-		    var o = { x: d.source.x0, y: d.source.y0 };
-		    return s.diagonal({ source: o, target: o });
-		  });
-		
-		  // Transition links to their new position.
-		  link.transition().duration(s.duration).delay(function (d) {
-		    return d.target.isNew ? s.delay : 0;
-		  }).attr("d", function (d) {
-		
-		    return s.diagonal({
-		      source: { x: d.source.x, y: d.source.y },
-		      target: { x: d.target.x, y: d.target.y } //-RADIUS+1 }
-		    });
-		  });
-		
-		  link.classed('is-flow', function (d) {
-		    return d.target.isFlow;
-		  }).classed('is-removed', function (d) {
-		    return d.target.isRemoved;
-		  }).classed('is-cancelled', function (d) {
-		    return _utils2.default.parentCancelled(d.target);
-		  });
-		  // Transition exiting nodes to the parent's new position.
-		  link.exit().remove();
-		}
-
-	/***/ }
-	/******/ ])));
-	//# sourceMappingURL=nflow-vis.js.map
+	exports.default = function (flow) {
+	  return [flow].concat(flow.parents()).map(function (flow, i, arr) {
+	    return {
+	      flow: flow,
+	      route: arr.slice(0, i + 1).reverse()
+	    };
+	  });
+	};
 
 /***/ },
-/* 7 */
+/* 38 */
+/***/ function(module, exports) {
+
+	"use strict";
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	/**
+	 *  returns: only itself and the node emitting it
+	 */
+
+	exports.default = function (flow) {
+	  return [flow].concat(flow.parent()).map(function (flow, i, arr) {
+	    return {
+	      flow: flow,
+	      route: arr.slice(0, i + 1).reverse()
+	    };
+	  });
+	};
+
+/***/ },
+/* 39 */
+/***/ function(module, exports) {
+
+	"use strict";
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	exports.default = function (flow) {
+	  var visitedNodesMap = {};
+
+	  var route = getChildren(flow, []).concat(getChildren(flow.parent(), [flow]));
+
+	  return route;
+	  function getChildren(flow, route) {
+	    if (visitedNodesMap[flow.guid()]) return [];
+	    visitedNodesMap[flow.guid()] = true;
+	    route = [flow].concat(route);
+	    var nodes = [{ flow: flow, route: route }];
+	    flow.children().forEach(function (f) {
+	      return nodes = nodes.concat(getChildren(f, route));
+	    });
+	    return nodes;
+	  }
+	};
+
+/***/ },
+/* 40 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _utils = __webpack_require__(31);
+
+	exports.default = function (flow) {
+	  var visitedNodesMap = {};
+	  var route = [];
+	  var parents = [flow].concat(flow.parents()).map(function (flow, i, arr) {
+	    return {
+	      flow: flow,
+	      route: arr.slice(0, i)
+	    };
+	  });
+
+	  parents.forEach(function (f) {
+	    // traverse downstream on detached nodes:
+	    if ((0, _utils.isDetached)(f.flow)) {
+	      route = route.concat(getChildren(f.flow, f.route.reverse()));
+	    } else {
+	      visitedNodesMap[f.flow.guid()] = true;
+	      var r = [f.flow].concat(f.route.reverse());
+	      route.push({ flow: f.flow, route: r });
+	    }
+	  });
+	  return route;
+	  function getChildren(flow, route) {
+	    var visited = visitedNodesMap[flow.guid()];
+	    visitedNodesMap[flow.guid()] = true;
+	    route = [flow].concat(route);
+	    var nodes = visited ? [] : [{ flow: flow, route: route }];
+	    flow.children().forEach(function (f) {
+	      return nodes = nodes.concat(getChildren(f, route));
+	    });
+	    return nodes;
+	  }
+	};
+
+/***/ },
+/* 41 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _consts = __webpack_require__(30);
+
+	var _logger = __webpack_require__(32);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	var _utils = __webpack_require__(31);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var guid = 0;
+
+	exports.default = function (flow, defaults, name) {
+
+	  flow.guid = function () {
+	    (0, _utils.assert)(arguments.length, _consts.ERRORS.invalidGuid);
+	    return flow.guid.value;
+	  };
+	  flow.guid.value = createGuid();
+
+	  flow.name = function () {
+	    var name = arguments.length <= 0 || arguments[0] === undefined ? _consts.UNSET : arguments[0];
+
+	    if (name === _consts.UNSET) return flow.name.value;
+	    (0, _utils.assert)(typeof name != "string", _consts.ERRORS.invalidName, name);
+	    var previousName = flow.name.value;
+	    flow.name.value = name;
+	    (0, _utils.dispatchInternalEvent)(flow, 'name', name, previousName);
+	    return flow;
+	  };
+	  flow.name.value = name || flow.guid();
+	  flow.name.isFlow = true;
+	  flow.name.isInternal = false;
+
+	  flow.call = function () {
+	    for (var _len = arguments.length, functions = Array(_len), _key = 0; _key < _len; _key++) {
+	      functions[_key] = arguments[_key];
+	    }
+
+	    functions.filter(function (f) {
+	      return typeof f == 'function';
+	    }).forEach(function (f) {
+	      return f(flow);
+	    });
+	    return flow;
+	  };
+	};
+
+	function createGuid() {
+	  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+	    var r = Math.random() * 16 | 0,
+	        v = c == 'x' ? r : r & 0x3 | 0x8;
+	    return v.toString(16);
+	  });
+	}
+
+/***/ },
+/* 42 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _consts = __webpack_require__(30);
+
+	var _utils = __webpack_require__(31);
+
+	var _logger = __webpack_require__(32);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.constructor === Symbol ? "symbol" : typeof obj; }
+
+	exports.default = function (flow) {
+	  flow.on = function () {
+	    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+	      args[_key - 1] = arguments[_key];
+	    }
+
+	    var name = arguments.length <= 0 || arguments[0] === undefined ? _consts.UNSET : arguments[0];
+
+	    if (name == _consts.UNSET) return flow.on.listenerMap; //TODO clone this!
+	    (0, _utils.assert)(typeof name != 'string', _consts.ERRORS.invalidListener);
+
+	    if (!args.length) {
+	      return flow.on.listenerMap[name];
+	    }
+
+	    if (args.length == 1 && args[0] == null) {
+	      (0, _utils.dispatchInternalEvent)(flow, 'listenerRemoved', name);
+	      delete flow.on.listenerMap[name];
+	      return flow;
+	    }
+	    var oldListeners = flow.on.listenerMap[name];
+	    flow.on.listenerMap[name] = args.filter(function (l) {
+	      return !(0, _utils.assert)(typeof l != 'function', _consts.ERRORS.invalidListenerType, (typeof l === 'undefined' ? 'undefined' : _typeof(l)) + ": " + l);
+	    });
+	    (0, _utils.dispatchInternalEvent)(flow, oldListeners ? 'listenerChanged' : 'listenerAdded', name);
+	    return flow;
+	  };
+	  flow.on.listenerMap = {};
+
+	  flow.on.notifyListeners = function (event) {
+	    if (flow.on.listenerMap[event.name()]) {
+	      event.target = flow;
+	      flow.on.listenerMap[event.name()].every(function (listener) {
+	        listener.apply(event, event.data.value);
+	        return event.status() == _consts.STATUS.FLOWING;
+	      });
+	      return true;
+	    }
+	  };
+	};
+
+/***/ },
+/* 43 */
+/***/ function(module, exports) {
+
+	"use strict";
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	exports.default = function (flow) {
+	  flow.toString = function () {
+	    return JSON.stringify(flow.toObj());
+	  };
+
+	  flow.toObj = function () {
+	    return {
+	      name: flow.name(),
+	      guid: flow.guid(),
+	      parent: {
+	        name: flow.parent() && flow.parent().name(),
+	        guid: flow.parent() && flow.parent().guid()
+	      },
+	      status: flow.status(),
+	      listeners: Object.keys(flow.on()),
+	      children: flow.children().map(function (f) {
+	        return { name: f.name(), guid: f.guid() };
+	      }),
+	      recipients: flow.emit.recipients && flow.emit.recipients.map(function (f) {
+	        return {
+	          flow: {
+	            guid: f.flow.guid(),
+	            name: f.flow.name() },
+	          route: f.route.map(function (f) {
+	            return {
+	              guid: f.guid(),
+	              name: f.name() };
+	          })
+	        };
+	      })
+	    };
+	  };
+	};
+
+/***/ },
+/* 44 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _logger = __webpack_require__(32);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	var _utils = __webpack_require__(31);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (flow, defaults, name, data) {
+	  flow.data = function () {
+	    for (var _len = arguments.length, data = Array(_len), _key = 0; _key < _len; _key++) {
+	      data[_key] = arguments[_key];
+	    }
+
+	    if (!data.length) {
+	      return flow.data.value.length <= 1 ? flow.data.value[0] : flow.data.value;
+	    }
+	    var oldData = flow.data.value;
+	    flow.data.value = data;
+	    (0, _utils.dispatchInternalEvent)(flow, 'data', data.length > 1 ? data : data[0], oldData.length > 1 ? oldData : oldData[0]);
+	    return flow;
+	  };
+	  flow.data.value = data;
+	};
+
+/***/ },
+/* 45 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	       value: true
+	});
+
+	var _consts = __webpack_require__(30);
+
+	var _logger = __webpack_require__(32);
+
+	var _logger2 = _interopRequireDefault(_logger);
+
+	var _utils = __webpack_require__(31);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (flow, defaults, name) {};
+
+/***/ },
+/* 46 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	exports.nflowVis = undefined;
+
+	var _vis = __webpack_require__(47);
+
+	var _vis2 = _interopRequireDefault(_vis);
+
+	var _tree = __webpack_require__(53);
+
+	var _tree2 = _interopRequireDefault(_tree);
+
+	var _timeline = __webpack_require__(59);
+
+	var _timeline2 = _interopRequireDefault(_timeline);
+
+	var _debug = __webpack_require__(60);
+
+	var _debug2 = _interopRequireDefault(_debug);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var nflowVis = exports.nflowVis = {
+	  Vis: _vis2.default,
+	  Tree: _tree2.default,
+	  Timeline: _timeline2.default,
+	  Debug: _debug2.default
+	};
+
+/***/ },
+/* 47 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	var _parser = __webpack_require__(48);
+
+	var _parser2 = _interopRequireDefault(_parser);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (parent) {
+	  return _nflow2.default.create('nflow-vis').parent(parent).call(_parser2.default);
+	};
+
+/***/ },
+/* 48 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _utils = __webpack_require__(49);
+
+	var _utils2 = _interopRequireDefault(_utils);
+
+	var _consts = __webpack_require__(50);
+
+	var _actions = __webpack_require__(51);
+
+	var _actions2 = _interopRequireDefault(_actions);
+
+	var _model = __webpack_require__(52);
+
+	var _model2 = _interopRequireDefault(_model);
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (parent) {
+
+	  var f = _nflow2.default.create('parser').parent(parent).call(_actions2.default).call(_model2.default).on('track', track);
+
+	  /**
+	   *  Tracks a note and treats as the root of the subtree to visualise
+	   */
+
+	  function track(root) {
+	    _utils2.default.assert(!root.name.isFlow, _consts.ERRORS.invalidTrackArgs);
+
+	    f.emit('action', 'start', _utils2.default.toObj(root), null, null);
+	    initLogger();
+	  }
+
+	  /**
+	   *  
+	   */
+	  function initLogger() {
+	    if (initLogger.inited) return;
+	    var model = f.emit('get-model').data();
+	    initLogger.inited = true;
+	    _nflow2.default.logger(function (flow, name, newData, oldData) {
+
+	      // avoid circular tracking
+	      if (flow.parents.has('nflow-vis')) return;
+
+	      // only track subnodes of the root node
+	      if (!model.nodeMap[flow.guid()]) {
+	        //console.warn('not tracking:', flow.name())
+	        return;
+	      };
+
+	      f.emit('action', name, _utils2.default.toObj(flow), _utils2.default.toObj(newData), _utils2.default.toObj(oldData));
+	    });
+	  }
+
+	  return f;
+	};
+
+/***/ },
+/* 49 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	var utils = {};
+
+	utils.parentCancelled = function (node) {
+	  if (!node) return false;
+	  return node.f.source.status == 'CANCELLED' || utils.parentCancelled(node.parent);
+	};
+
+	utils.hasNoRecipients = function (node) {
+	  return node.f.source.recipients && node.f.source.recipients.length == 0;
+	};
+
+	utils.isRecipient = function (node, s) {
+	  if (!node || !s.showRoute || !s.showRoute.f.source.recipients) return false;
+
+	  return s.showRoute.f.source.recipients.some(function (f) {
+	    return f.flow.guid == node.f.guid;
+	  });
+	};
+
+	utils.isEmitter = function (node, s) {
+	  if (!node || !s.showRoute || !s.showRoute.f.source.recipients) return false;
+
+	  return s.showRoute.f.source.parent.guid == node.f.guid;
+	};
+
+	/**
+	 * the node where the event re-enters into the tree
+	 * from an event chain
+	 */
+	utils.isEntryPoint = function (node, s) {
+	  if (!node || !s.showRoute || !s.showRoute.f.source.recipients) return false;
+
+	  var entryPoint = s.showRoute;
+	  while (entryPoint && entryPoint.f.isEvent) {
+	    entryPoint = entryPoint.parent;
+	  }
+	  return entryPoint.f.guid == node.f.guid;
+	};
+
+	utils.assert = function (condition, error, val) {
+	  if (condition) {
+	    throw new Error(error.replace("%s", val));
+	  }
+	  return condition;
+	};
+
+	utils.toObj = function (d) {
+	  return d && d.name && d.name.isFlow ? d.toObj() : d;
+	};
+
+	//TODO check maxHeight as well
+	utils.fitText = function (maxWidth) {
+	  return function (d) {
+	    var d3text = d3.select(this);
+	    var bb = d3text.node().getBBox();
+	    var r = maxWidth / bb.width;
+	    r = Math.min(r, 1);
+	    d3text.style('transform', 'scale(' + r + ')');
+	  };
+	};
+	utils.wrapText = function (maxWidth) {
+	  return function (d) {
+
+	    var d3text = d3.select(this),
+	        words = d.displayName.replace(/(-|\.|\s)/g, '$&{SEP}').split('{SEP}').reverse(),
+	        word,
+	        line = [],
+	        lineNumber = 0,
+	        lineHeight = .5,
+	        // ems
+	    x = d3text.attr("x"),
+	        y = d3text.attr("y"),
+	        dy = parseFloat(d3text.attr("dy")),
+	        tspan = d3text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+
+	    while (word = words.pop()) {
+	      line.push(word);
+	      tspan.text(line.join(""));
+	      if (tspan.node().getComputedTextLength() > maxWidth && line.length > 1) {
+	        line.pop();
+	        tspan.text(line.join(""));
+	        line = [word];
+	        tspan = d3text.append("tspan").attr("x", x).attr("y", y).attr("dy", lineHeight + dy + "em").text(word);
+	      }
+	    }
+	  };
+	};
+
+	exports.default = utils;
+
+/***/ },
+/* 50 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	var ERRORS = exports.ERRORS = {
+	  invalidRootArgs: 'Invalid Argument. Please use a flow object as the root parameter',
+	  invalidTrackArgs: 'Invalid Argument. Please use the imported nFlow object as the track parameter',
+	  invalidOnChangeArgs: 'Invalid Argument. Please use a Function as the callback'
+	};
+
+/***/ },
+/* 51 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var actions = {};
+
+	exports.default = function (parent) {
+	  var f = _nflow2.default.create('actions').parent(parent).on('action', parseAction);
+
+	  /**
+	   *  Parses a new action(eg. flow emitted action),
+	   *  and stores the new tree state in the model 
+	   */
+	  function parseAction(name) {
+	    var s = f.emit('get-model').data();
+
+	    for (var _len = arguments.length, data = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+	      data[_key - 1] = arguments[_key];
+	    }
+
+	    if (actions[name]) {
+	      //console.log(name, data)
+	      actions[name].apply(actions, [s].concat(data));
+	      throttledUpdate();
+	    } else {
+	      console.warn('no parser found for "' + name + '"', data);
+	    }
+	  }
+
+	  function throttledUpdate() {
+	    if (throttledUpdate.timer) return;
+
+	    throttledUpdate.timer = setTimeout(function () {
+	      delete throttledUpdate.timer;
+	      var s = f.emit('get-model').data();
+	      //console.log('update', s)
+	      f.emit('update', s);
+	    }, 200);
+	  }
+	};
+
+	actions.listenerAdded = actions.listenerRemoved = function (s, f, newData, oldData) {
+	  var e = s.nodeMap[f.guid];
+	  if (!e) return;
+	  e.source = f;
+	  updateHash(e);
+	};
+
+	actions.start = function (s, f, newData, oldData) {
+	  console.log('starting', s, f);
+	  s.root = {
+	    name: f.name,
+	    guid: f.guid,
+	    parent: null,
+	    children: [],
+	    numInstances: 1,
+	    source: f
+	  };
+	  updateHash(s.root);
+	  s.nodeMap[s.root.guid] = s.root;
+	};
+
+	actions.create = function (s, f, newData, oldData) {
+	  if (!s.root) actions.start(s, f, newData, oldData);
+
+	  var p = s.nodeMap[f.guid];
+	  if (!p) return;
+	  p.children = p.children || [];
+	  var existingNode = p.children.filter(function (c) {
+	    return c.name == newData.name;
+	  }).pop();
+	  var e = s.nodeMap[newData.guid] = {
+	    name: newData.name,
+	    guid: newData.guid,
+	    children: [],
+	    numInstances: 1,
+	    x0: p.x0,
+	    y0: p.y0,
+	    source: newData
+	  };
+	  updateHash(e);
+	  // if (existingNode){
+	  //   removeNode(existingNode,s)
+	  //   s.nodeMap[newData.guid].numInstances+=existingNode.numInstances
+	  //   s.nodeMap[newData.guid].isNew= false
+	  // }
+
+	  p.children.push(e);
+	};
+
+	actions.emit = function (s, f, newData, oldData) {
+	  var e = s.nodeMap[f.guid];
+	  if (!e) return;
+	  e.source = f;
+	  e.isEvent = true;
+	  updateHash(e);
+	};
+
+	actions.name = function (s, f, newData, oldData) {
+	  var e = s.nodeMap[f.guid];
+	  if (!e) return;
+	  e.source = f;
+	  e.name = f.name;
+	  updateHash(e);
+	};
+
+	actions.data = function (s, f, newData, oldData) {
+	  var e = s.nodeMap[f.guid];
+	  if (!e) return;
+	  e.data = newData;
+	  //updateHash(e)
+	};
+	actions.emitted = function (s, f, newData, oldData) {
+	  var e = s.nodeMap[f.guid];
+	  if (!e) return;
+	  e.source = f;
+	  updateHash(e);
+	};
+
+	actions.cancel = function (s, f, newData, oldData) {
+	  var e = s.nodeMap[f.guid];
+	  if (!e) return;
+	  e.source = f;
+	  updateHash(e);
+	};
+
+	actions.childRemoved = function (s, f, oldParent) {
+	  var e = s.nodeMap[f.guid];
+	  if (!e) return;
+	  e.isRemoved = true;
+	  updateHash(e);
+	};
+
+	actions.childAdded = function (s, f, newParent, oldParent) {
+	  var e = s.nodeMap[f.guid];
+	  if (!e) return;
+	  e.isRemoved = newParent == null;
+	  updateHash(e);
+
+	  // remove child from old parent
+	  var oldP = oldParent && s.nodeMap[oldParent.guid];
+	  if (oldP && newParent) oldP.children = oldP.children.filter(function (n) {
+	    return n.guid != f.guid;
+	  });
+
+	  // add to new parent
+	  var newP = newParent && s.nodeMap[newParent.guid];
+	  if (newP) {
+	    newP.children = newP.children || [];
+	    newP.children.push(e);
+	  }
+	};
+
+	function removeNode(d, s) {
+	  d.childen && d.children.forEach(function (n) {
+	    return removeNode(n, s);
+	  });
+	  if (d.parent) d.parent.children = d.parent.children.filter(function (n) {
+	    return n.guid != d.guid;
+	  });
+	  delete s.nodeMap[d.guid];
+	}
+
+	function updateHash(d) {
+	  d.hash = createGuid();
+	}
+
+	function createGuid() {
+	  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+	    var r = Math.random() * 16 | 0,
+	        v = c == 'x' ? r : r & 0x3 | 0x8;
+	    return v.toString(16);
+	  });
+	}
+
+/***/ },
+/* 52 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (parent) {
+	  return _nflow2.default.create('model').parent(parent).data({
+	    root: null,
+	    nodeMap: {}
+	  }).on('get-model', function () {
+	    this.data(this.target.data());
+	  });
+	};
+
+/***/ },
+/* 53 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	__webpack_require__(54);
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	var _nodes = __webpack_require__(56);
+
+	var _nodes2 = _interopRequireDefault(_nodes);
+
+	var _links = __webpack_require__(58);
+
+	var _links2 = _interopRequireDefault(_links);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (parent) {
+	  return _nflow2.default.create('tree').parent(parent).call(_nodes2.default).call(_links2.default).data({
+	    tree: null,
+	    dom: null,
+	    duration: 200,
+	    delay: 0,
+	    dragging: true, //true, false, horizontal
+	    showEvents: true,
+	    nodes: null,
+	    links: null,
+	    maxBatchLength: 7,
+	    clonedNodes: {}
+	  }).on('update', update, render).on('dom', dom, init, resize).on('dragging', dragging).on('show-events', showEvents).on('select-node', selectNode).on('type', setType).on('resize', resize, redraw).call(function (f) {
+	    return setType.call(f);
+	  });
+	};
+
+	function dragging(flag) {
+	  this.target.data().dragging = flag;
+	}
+
+	function showEvents(flag) {
+	  this.target.data().showEvents = flag;
+	}
+
+	function selectNode(node) {
+	  if (this.target.data().selectedNode == node) return;
+	  this.target.data().selectedNode = node;
+	  console.log('selectedNode', this.target.data().selectedNode);
+	  var s = this.emit('get-model').data();
+	  this.emit('update', s);
+	}
+
+	function redraw() {
+	  var s = this.emit('get-model').data();
+	  this.emit('update', s);
+	}
+
+	function update(d) {
+	  console.log('update');
+	  var flow = this.target;
+	  var tree = flow.data().tree;
+	  var fd = flow.data();
+	  var pd = flow.parent().data();
+	  fd.nodesByDepth = [];
+	  var i = 0;
+	  if (d) {
+	    var rootNode = pd && pd.eventRoot || d.root;
+	    if (!rootNode) {
+	      this.stopPropagation();
+	      return;
+	    }
+
+	    var root = cloneNode(rootNode, fd);
+	    fd.nodes = tree.nodes(root); //.reverse(),
+	    fd.links = tree.links(fd.nodes);
+	    fd.nodeMap = {};
+	    fd.nodes.forEach(function (d) {
+	      if (!fd.nodesByDepth[d.depth]) fd.nodesByDepth[d.depth] = [];
+
+	      fd.nodesByDepth[d.depth].push(d);
+	      fd.nodeMap[d.f.guid] = d;
+	      //d.y0 =d.y = d.depth*50+Math.random()*50
+	      d.y = d.depth * (root.hidden ? 40 : 50) + (root.hidden ? 0 : 50);
+	      d.x += fd.width / 2;
+
+	      d.hidden = d.f.hidden;
+	      d.needsUpdate = d.f.hash != d.f.hash0 || d.x != d.x0 || d.y != d.y0;
+
+	      if (d.needsUpdate) d.updateIndex = i++;
+	      d.f.hash0 = d.f.hash;
+
+	      d.x0 = d.x0 != null ? d.x : d.parent && !d.parent.hidden ? d.parent.x : d.x;
+	      d.y0 = d.y0 != null ? d.y : d.parent && !d.parent.hidden ? d.parent.y : d.y;
+	    });
+	    fd.nodesByDepth.forEach(function (nodes, i) {
+	      if (nodes.length == 1) {
+	        var node = nodes[0];
+	        node.displayName = node.f.name;
+	        node.recurring = false;
+	      }
+	      nodes.reduce(function (a, b) {
+	        var distance = b.x - a.x;
+	        a.recurring = a.f.name == b.f.name && distance < a.f.name.length * 18;
+	        a.displayName = a.recurring ? '' : a.f.name;
+	        b.displayName = b.f.name;
+	        return b;
+	      });
+	    });
+	  }
+	  //console.log(d)
+	}
+
+	function dom(dom) {
+	  this.target.data().dom = dom;
+	  this.target.data().isSVG = dom instanceof SVGElement;
+	}
+
+	function setType() {
+	  var type = arguments.length <= 0 || arguments[0] === undefined ? 'tree' : arguments[0];
+
+	  var f = this.target || this;
+
+	  var d = f.data();
+	  d.type = type;
+	  if (type == 'tree') {
+	    d.tree = d3.layout.tree();
+	  }
+	  if (type == 'cluster') {
+	    d.tree = d3.layout.cluster();
+	  }
+	  d.tree.separation(function (a, b) {
+	    //console.log('sep', a.f.name, b.f.name, a.depth, b)
+	    return a.f.name == b.f.name ? .05 : 1; //b.f.name.length*.1
+	  }).nodeSize([100, 50]).children(function (e) {
+	    return d.showEvents ? e.f.children.map(function (e) {
+	      return cloneNode(e, d);
+	    }) : e.f.children && e.f.children.filter(function (e) {
+	      return !e.isEvent;
+	    }).map(function (e) {
+	      return cloneNode(e, d);
+	    });
+	  });
+	}
+
+	function cloneNode(e, d) {
+	  if (!d.clonedNodes[e.guid]) d.clonedNodes[e.guid] = { f: e };
+	  return d.clonedNodes[e.guid];
+	}
+
+	function init() {
+	  var _this = this;
+
+	  var d = this.target.data();
+	  var d3dom = d3.select(d.dom);
+
+	  d.d3svg = d3dom.html("");
+	  if (!d.isSVG) d.d3svg = d3dom.append("svg");
+
+	  d.d3g = d.d3svg.classed('nflow-vis-tree', true).append('g').classed('drag', true);
+
+	  d.dragging && d.d3g.call(d3.behavior.zoom().scaleExtent([.2, 1]).on("zoom", zoom));
+	  //.call(zoom)
+
+	  d.d3overlay = d.d3g.append("rect").classed("overlay", true).on("click", function () {
+	    return _this.emit('select-node', null);
+	  });
+
+	  //TODO: move these into their respective nodes
+	  d.d3contents = d.d3g.append('g').classed('tree', true);
+	  d.d3links = d.d3contents.append('g').classed('links', true);
+	  d.d3routes = d.d3contents.append('g').classed('routes', true);
+	  d.d3nodes = d.d3contents.append('g').classed('nodes', true);
+
+	  // this.target
+	  //   .get('links')
+	  //   .emit.downstream('dom', d.d3links.node())
+
+	  function zoom() {
+	    var t = d3.event.translate,
+	        s = d3.event.scale;
+	    if (d.dragging == 'horizontal') t[1] = 0;
+	    //zoom.translate(t);
+	    d.d3contents.attr("transform", "translate(" + t + ")scale(" + s + ")");
+	  }
+	}
+
+	function render() {
+	  var d = this.target.data();
+	  // d.d3links
+	  //   .selectAll('.link')
+	  //   .data(d.links)
+	}
+
+	function resize() {
+	  var d = this.target.data();
+	  var d3dom = d3.select(d.dom);
+	  d.width = d.isSVG ? parseInt(d3dom.attr('width')) : parseInt(d3dom.style('width'));
+	  d.height = d.isSVG ? parseInt(d3dom.attr('height')) : parseInt(d3dom.style('height'));
+
+	  d.d3svg.attr("width", d.width).attr("height", d.height);
+
+	  d.d3overlay.attr("width", d.width).attr("height", d.height);
+	}
+
+/***/ },
+/* 54 */
 /***/ function(module, exports) {
 
 	// removed by extract-text-webpack-plugin
 
 /***/ },
-/* 8 */,
-/* 9 */,
-/* 10 */,
-/* 11 */
-/***/ function(module, exports) {
+/* 55 */,
+/* 56 */
+/***/ function(module, exports, __webpack_require__) {
 
-	// removed by extract-text-webpack-plugin
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _paths = __webpack_require__(57);
+
+	var _utils = __webpack_require__(49);
+
+	var _utils2 = _interopRequireDefault(_utils);
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (parent) {
+	  return _nflow2.default.create('nodes').parent(parent).data({
+	    dom: null,
+	    diagonal: d3.svg.diagonal()
+	  }).on('dom', dom).on('update', render);
+	};
+
+	function dom(dom) {
+	  this.target.data().dom = dom;
+	}
+
+	function render() {
+	  var flow = this.target;
+	  var tree = this.target.parent();
+	  var d = this.target.data();
+	  var td = tree.data();
+	  var d3dom = td.d3nodes;
+	  var nodes = td.nodes.filter(function (e) {
+	    return !e.hidden;
+	  });
+	  // Update the nodes
+	  var node = d3dom.selectAll("g.node").data(nodes, function (d) {
+	    return d.f.guid;
+	  });
+
+	  var nodeEnter = node.enter().append("g").attr("class", "node").style("opacity", 0).attr("transform", function (d) {
+	    return "translate(" + d.x0 + "," + d.y0 + ")";
+	  }).on("click", function (d) {
+	    return flow.emit('select-node', d);
+	  });
+
+	  nodeEnter.append('path').attr("transform", "scale(.8)").attr("d", _paths.CIRCLE);
+
+	  nodeEnter.append('g').classed('listeners', true);
+
+	  nodeEnter.append('g').attr("transform", 'translate(' + (_paths.RADIUS + 4) + ',0)').append("text").attr("x", 0).attr("dy", ".35em").style("fill-opacity", .1);
+
+	  var changedNodes = node.filter(function (d) {
+	    return d.needsUpdate;
+	  });
+
+	  console.log('changedNodes', changedNodes.size());
+	  var nodeUpdate = changedNodes.transition().delay(function (d) {
+	    return d.updateIndex * td.delay;
+	  }).style("opacity", 1).duration(td.duration).attr("transform", function (d) {
+	    return "translate(" + d.x + "," + d.y + ")";
+	  }).each("end", function (d) {
+	    d3.select(this).select("text").text(function (d) {
+	      return d.displayName;
+	    }).style("fill-opacity", 1).each(_utils2.default.wrapText(120)).each(_utils2.default.fitText(70));
+	  });
+
+	  changedNodes.select('path').classed('is-flow', function (d) {
+	    return d.f.isEvent;
+	  });
+
+	  changedNodes.classed('is-cancelled', function (d) {
+	    return d.f.source.status == 'CANCELLED';
+	  }).classed('is-parent-cancelled', function (d) {
+	    return _utils2.default.parentCancelled(d);
+	  }).classed('is-recipient', function (d) {
+	    return _utils2.default.isRecipient(d, td);
+	  }).classed('has-no-recipients', function (d) {
+	    return _utils2.default.hasNoRecipients(d);
+	  }).classed('is-emitter', function (d) {
+	    return _utils2.default.isEntryPoint(d, td);
+	  }).call(listeners);
+
+	  nodeUpdate.select("path").attr('d', function (d) {
+	    return d.f.isEvent ? _paths.DROP : _paths.CIRCLE;
+	  });
+
+	  var nodeExit = node.exit().remove();
+	}
+
+	function listeners(sel) {
+	  var R = 2;
+
+	  var e = sel.select('.listeners').selectAll('.listener').data(function (d) {
+	    return d.f.source.listeners;
+	  });
+
+	  var l = e.enter().append('g').classed('listener', true).attr("transform", function (d, i) {
+	    return "translate(" + (_paths.RADIUS + R) + "," + (_paths.RADIUS + i * (R + .5) * 2) + ")";
+	  });
+
+	  //TODO add tooltips
+	  //l.append('text')
+	  //.text(String)
+
+	  l.append('circle').attr("r", R).attr('title', String);
+
+	  e.exit().remove();
+	}
 
 /***/ },
-/* 12 */,
-/* 13 */
+/* 57 */
+/***/ function(module, exports) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	var CIRCLE = exports.CIRCLE = 'm-12.50001,0.54385c0,-7.20655 5.8373,-13.04385 13.04385,-13.04385c7.20655,0 13.04385,5.8373 13.04385,13.04385c0,7.20655 -5.8373,13.04385 -13.04385,13.04385c-7.20655,0 -13.04385,-5.8373 -13.04385,-13.04385z';
+	var DROP = exports.DROP = 'm9.72864,6.18447c0,5.21228 -4.34827,9.44253 -9.70596,9.44253c-5.35769,0 -9.80507,-4.2312 -9.70595,-9.44253c0.1317,-6.99036 5.4678,-9.83766 9.70595,-17.87197c4.50158,7.77089 9.70596,12.65969 9.70596,17.87197z';
+	var RADIUS = exports.RADIUS = 10.4;
+
+/***/ },
+/* 58 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _paths = __webpack_require__(57);
+
+	var _utils = __webpack_require__(49);
+
+	var _utils2 = _interopRequireDefault(_utils);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (parent) {
+	  return nflow.create('links').parent(parent).data({
+	    dom: null,
+	    diagonal: d3.svg.diagonal()
+	  }).on('dom', dom).on('update', render, updateRoutes);
+	};
+
+	function dom(dom) {
+	  this.target.data().dom = dom;
+	}
+
+	function render() {
+
+	  var tree = this.target.parent();
+	  var flow = this.target;
+	  var d = flow.data();
+	  var td = tree.data();
+	  var d3dom = td.d3links;
+	  var links = td.links.filter(function (link) {
+	    return !link.source.hidden && !link.target.hidden;
+	  });
+	  // Update the links
+	  var link = d3dom.selectAll("path.link").data(links, function (d) {
+	    return d.target.f.guid;
+	  });
+	  // Enter any new links at the parent's previous position.
+	  link.enter().insert("path", "g").attr("class", "link").attr("d", function (d0) {
+	    var o = {
+	      x: d0.source.x,
+	      y: d0.source.y
+	    };
+	    return d.diagonal({ source: o, target: o });
+	  });
+
+	  var changedLinks = link.filter(function (d) {
+	    return d.source.needsUpdate || d.target.needsUpdate;
+	  });
+	  // Transition links to their new position.
+	  changedLinks.transition().duration(td.duration).delay(function (d) {
+	    return d.target.updateIndex * td.delay;
+	  }).attr("d", getCoords.bind(flow));
+
+	  changedLinks.classed('is-flow', function (d) {
+	    return d.target.f.isEvent;
+	  }).classed('is-removed', function (d) {
+	    return d.target.f.isRemoved;
+	  }).classed('is-cancelled', function (d) {
+	    return _utils2.default.parentCancelled(d.target);
+	  });
+	  // Transition exiting nodes to the parent's new position.
+	  link.exit().remove();
+	}
+
+	function updateRoutes(data) {
+	  var flow = this.target;
+	  var tree = flow.parent();
+	  var d = flow.data();
+	  var td = tree.data();
+	  var d3dom = td.d3nodes;
+	  var nodes = td.nodes;
+	  if (!td.showRoute || !td.showRoute.f.source.recipients) {
+	    td.d3routes.html('');
+	    return;
+	  };
+	  var line = d3.svg.line().x(function (d) {
+	    return d.x;
+	  }).y(function (d) {
+	    return d.y;
+	  }).interpolate('linear');
+
+	  var paths = td.d3routes.selectAll("g.route").data(td.showRoute.f.source.recipients, function (d) {
+	    return d.flow.guid;
+	  });
+
+	  paths.enter().append('g').classed('route', true);
+
+	  var links = paths.selectAll('path.link').data(function (d) {
+	    var r = d.route.concat();
+	    var pairs = [];
+	    while (r.length > 1) {
+	      pairs.push({
+	        source: td.nodeMap[r[0].guid],
+	        target: td.nodeMap[r[1].guid] });
+	      r.shift();
+	    }
+	    pairs = pairs.filter(function (pair) {
+	      return pair.source && pair.target;
+	    }).filter(function (pair) {
+	      return !pair.source.hidden && !pair.target.hidden;
+	    });
+	    return pairs;
+	  });
+
+	  links.enter().insert("path", "g").attr("class", "link");
+
+	  links.attr("d", getCoords.bind(flow));
+	}
+
+	function getCoords(d) {
+	  return this.data().diagonal({
+	    source: { x: d.source.x, y: d.source.y },
+	    target: { x: d.target.x, y: d.target.y - (d.target.f.isEvent ? 7 : 0) }
+	  });
+	}
+
+/***/ },
+/* 59 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _tree = __webpack_require__(53);
+
+	var _tree2 = _interopRequireDefault(_tree);
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
+	exports.default = function (parent) {
+	  return _nflow2.default.create('timeline').parent(parent).call(_tree2.default).data({
+	    eventRoot: {
+	      name: 'event-root',
+	      guid: -1,
+	      parent: null,
+	      children: [],
+	      source: null,
+	      hidden: true
+	    },
+	    d3dom: null
+	  }).on('update', updateEventRoot, updateBG).call(init)
+	  // .on('allow-dragging', allowDragging)
+	  // .on('show-events', showEvents)
+	  // .on('show-route', showRoute)
+	  // .on('type', setType)
+
+	  ;
+	};
+
+	function init(f) {
+	  var d = f.data();
+	  f.emit.downstream('dragging', 'horizontal');
+	  f.create('lines').on('dom', function (dom) {
+	    d.d3dom = d3.select(dom);
+	  }, dom);
+	}
+
+	function dom(d) {
+
+	  var d3dom = d3.select(d);
+
+	  var drag = d3dom.select('.tree').insert('g', ":first-child").classed('timeline-bg', true);
+	}
+
+	function updateEventRoot(d) {
+	  //console.log('timeline update')
+	  d.eventRoot = this.target.data().eventRoot;
+	  d.eventRoot.source = d.root.source;
+	  d.eventRoot.guid = d.root.guid;
+	  d.eventRoot.children = [];
+	  findEvents(d.root);
+
+	  function findEvents(node) {
+	    node.children.forEach(function (e) {
+	      if (e.isEvent) {
+	        //let n = clone(e, node)
+	        var n = e;
+	        n && d.eventRoot.children.push(n);
+	      } else findEvents(e);
+	    });
+	  }
+
+	  function clone(e, p) {
+	    var lastEvent = d.eventRoot.children.length && d.eventRoot.children[d.eventRoot.children.length - 1];
+
+	    // if (lastEvent.source == p.source) {
+	    //   lastEvent.children.push(e)
+	    //   return null
+	    // }
+	    return {
+	      name: p.name,
+	      guid: p.guid + '-' + d.eventRoot.children.length,
+	      children: [e],
+	      source: p.source
+	    };
+	  }
+	}
+
+	function updateBG(d) {
+	  var maxDepth = getMaxDepth(d.eventRoot);
+	  var depthArr = Array(maxDepth).fill();
+
+	  var data = this.target.data();
+	  var sel = data.d3dom.select('.timeline-bg').selectAll('rect').data(depthArr);
+
+	  sel.enter().append('rect').attr("x", -10000).attr("y", function (d, i) {
+	    return 40 + i * 40;
+	  }).attr("width", 20000).attr("height", 40);
+
+	  sel.exit().remove();
+	}
+
+	function getMaxDepth(node) {
+	  var _Math;
+
+	  var i = arguments.length <= 1 || arguments[1] === undefined ? 0 : arguments[1];
+
+	  if (!node.children || !node.children.length) return i;
+	  return (_Math = Math).max.apply(_Math, _toConsumableArray(node.children.map(function (e) {
+	    return getMaxDepth(e, i + 1);
+	  })));
+	}
+
+/***/ },
+/* 60 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+
+	var _nflow = __webpack_require__(25);
+
+	var _nflow2 = _interopRequireDefault(_nflow);
+
+	var _parser = __webpack_require__(48);
+
+	var _parser2 = _interopRequireDefault(_parser);
+
+	var _tree = __webpack_require__(53);
+
+	var _tree2 = _interopRequireDefault(_tree);
+
+	var _timeline = __webpack_require__(59);
+
+	var _timeline2 = _interopRequireDefault(_timeline);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	exports.default = function (parent) {
+	  return _nflow2.default.create('flow-vis-debug').parent(parent).data({
+	    d3dom: null,
+	    selectedNode: null
+	  }).call(_parser2.default).on('dom', dom).on('select-node', selectNode);
+	};
+
+	function dom(dom) {
+	  console.log(dom);
+	  var flow = this.target;
+	  var d = flow.data();
+	  var isSVG = dom instanceof SVGElement;
+	  d.d3dom = d3.select(dom);
+
+	  if (!isSVG) d.d3dom = d.d3dom.append('svg').attr('width', '100%').attr('height', '100%');
+
+	  d.d3dom.classed('flow-vis-debug', true);
+
+	  d.d3tree = d.d3dom.append('g').classed('tree', true);
+
+	  d.d3timeline = d.d3dom.append('g').classed('timeline', true);
+
+	  resize(d);
+	  var tree = (0, _tree2.default)(flow);
+	  tree.emit.downstream('dom', d.d3tree.node());
+	  tree.emit.downstream('show-events', false);
+
+	  var timeline = nflowVis.Timeline(flow);
+	  timeline.emit.downstream('dom', d.d3timeline.node());
+	}
+
+	function resize(d) {
+	  var w = parseInt(d.d3dom.style('width'));
+	  var h = parseInt(d.d3dom.style('height'));
+	  var TIMELINE_HEIGHT = 200;
+	  d.d3tree.attr('width', w).attr('height', h);
+
+	  d.d3timeline.attr('width', w).attr('height', TIMELINE_HEIGHT).attr('transform', 'translate(0,' + (h - TIMELINE_HEIGHT) + ')');
+	}
+
+	function selectNode(node) {
+	  if (this.target.data().selectedNode == node) return;
+	  this.target.data().selectedNode = node;
+	  console.log('selectedNode', this.target.data().selectedNode);
+	  var s = this.emit('get-model').data();
+	  this.emit('update', s);
+	}
+
+/***/ },
+/* 61 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	'use strict';
+
+	(function() {
+
+	var global = this
+	  , addEventListener = 'addEventListener'
+	  , removeEventListener = 'removeEventListener'
+	  , getBoundingClientRect = 'getBoundingClientRect'
+	  , isIE8 = global.attachEvent && !global[addEventListener]
+	  , document = global.document
+
+	  , calc = (function () {
+	        var el
+	          , prefixes = ["", "-webkit-", "-moz-", "-o-"]
+
+	        for (var i = 0; i < prefixes.length; i++) {
+	            el = document.createElement('div')
+	            el.style.cssText = "width:" + prefixes[i] + "calc(9px)"
+
+	            if (el.style.length) {
+	                return prefixes[i] + "calc"
+	            }
+	        }
+	    })()
+	  , elementOrSelector = function (el) {
+	        if (typeof el === 'string' || el instanceof String) {
+	            return document.querySelector(el)
+	        } else {
+	            return el
+	        }
+	    }
+
+	  , Split = function (ids, options) {
+	    var dimension
+	      , i
+	      , clientDimension
+	      , clientAxis
+	      , position
+	      , gutterClass
+	      , paddingA
+	      , paddingB
+	      , pairs = []
+
+	    // Set defaults
+
+	    options = typeof options !== 'undefined' ?  options : {}
+
+	    if (!options.gutterSize) options.gutterSize = 10
+	    if (!options.minSize) options.minSize = 100
+	    if (!options.snapOffset) options.snapOffset = 30
+	    if (!options.direction) options.direction = 'horizontal'
+
+	    if (options.direction == 'horizontal') {
+	        dimension = 'width'
+	        clientDimension = 'clientWidth'
+	        clientAxis = 'clientX'
+	        position = 'left'
+	        gutterClass = 'gutter gutter-horizontal'
+	        paddingA = 'paddingLeft'
+	        paddingB = 'paddingRight'
+	        if (!options.cursor) options.cursor = 'ew-resize'
+	    } else if (options.direction == 'vertical') {
+	        dimension = 'height'
+	        clientDimension = 'clientHeight'
+	        clientAxis = 'clientY'
+	        position = 'top'
+	        gutterClass = 'gutter gutter-vertical'
+	        paddingA = 'paddingTop'
+	        paddingB = 'paddingBottom'
+	        if (!options.cursor) options.cursor = 'ns-resize'
+	    }
+
+	    // Event listeners for drag events, bound to a pair object.
+	    // Calculate the pair's position and size when dragging starts.
+	    // Prevent selection on start and re-enable it when done.
+
+	    var startDragging = function (e) {
+	            var self = this
+	              , a = self.a
+	              , b = self.b
+
+	            if (!self.dragging && options.onDragStart) {
+	                options.onDragStart()
+	            }
+
+	            e.preventDefault()
+
+	            self.dragging = true
+	            self.move = drag.bind(self)
+	            self.stop = stopDragging.bind(self)
+
+	            global[addEventListener]('mouseup', self.stop)
+	            global[addEventListener]('touchend', self.stop)
+	            global[addEventListener]('touchcancel', self.stop)
+
+	            self.parent[addEventListener]('mousemove', self.move)
+	            self.parent[addEventListener]('touchmove', self.move)
+
+	            a[addEventListener]('selectstart', preventSelection)
+	            a[addEventListener]('dragstart', preventSelection)
+	            b[addEventListener]('selectstart', preventSelection)
+	            b[addEventListener]('dragstart', preventSelection)
+
+	            a.style.userSelect = 'none'
+	            a.style.webkitUserSelect = 'none'
+	            a.style.MozUserSelect = 'none'
+	            a.style.pointerEvents = 'none'
+
+	            b.style.userSelect = 'none'
+	            b.style.webkitUserSelect = 'none'
+	            b.style.MozUserSelect = 'none'
+	            b.style.pointerEvents = 'none'
+
+	            self.gutter.style.cursor = options.cursor
+	            self.parent.style.cursor = options.cursor
+
+	            calculateSizes.call(self)
+	        }
+	      , stopDragging = function () {
+	            var self = this
+	              , a = self.a
+	              , b = self.b
+
+	            if (self.dragging && options.onDragEnd) {
+	                options.onDragEnd()
+	            }
+
+	            self.dragging = false
+
+	            global[removeEventListener]('mouseup', self.stop)
+	            global[removeEventListener]('touchend', self.stop)
+	            global[removeEventListener]('touchcancel', self.stop)
+
+	            self.parent[removeEventListener]('mousemove', self.move)
+	            self.parent[removeEventListener]('touchmove', self.move)
+
+	            delete self.stop
+	            delete self.move
+
+	            a[removeEventListener]('selectstart', preventSelection)
+	            a[removeEventListener]('dragstart', preventSelection)
+	            b[removeEventListener]('selectstart', preventSelection)
+	            b[removeEventListener]('dragstart', preventSelection)
+
+	            a.style.userSelect = ''
+	            a.style.webkitUserSelect = ''
+	            a.style.MozUserSelect = ''
+	            a.style.pointerEvents = ''
+
+	            b.style.userSelect = ''
+	            b.style.webkitUserSelect = ''
+	            b.style.MozUserSelect = ''
+	            b.style.pointerEvents = ''
+
+	            self.gutter.style.cursor = ''
+	            self.parent.style.cursor = ''
+	        }
+	      , drag = function (e) {
+	            var offset
+
+	            if (!this.dragging) return
+
+	            // Get the relative position of the event from the first side of the
+	            // pair.
+
+	            if ('touches' in e) {
+	                offset = e.touches[0][clientAxis] - this.start
+	            } else {
+	                offset = e[clientAxis] - this.start
+	            }
+
+	            // If within snapOffset of min or max, set offset to min or max
+
+	            if (offset <=  this.aMin + options.snapOffset) {
+	                offset = this.aMin
+	            } else if (offset >= this.size - this.bMin - options.snapOffset) {
+	                offset = this.size - this.bMin
+	            }
+	            console.log(offset)
+	            adjust.call(this, offset)
+
+	            if (options.onDrag) {
+	                options.onDrag()
+	            }
+	        }
+	      , calculateSizes = function () {
+	            // Calculate the pairs size, and percentage of the parent size
+	            var computedStyle = global.getComputedStyle(this.parent)
+	              , parentSize = this.parent[clientDimension] - parseFloat(computedStyle[paddingA]) - parseFloat(computedStyle[paddingB])
+
+	            this.size = this.a[getBoundingClientRect]()[dimension] + this.b[getBoundingClientRect]()[dimension] + this.aGutterSize + this.bGutterSize
+	            this.percentage = Math.min(this.size / parentSize * 100, 100)
+	            this.start = this.a[getBoundingClientRect]()[position]
+	        }
+	      , adjust = function (offset) {
+	            // A size is the same as offset. B size is total size - A size.
+	            // Both sizes are calculated from the initial parent percentage.
+
+	            this.a.style[dimension] = calc + '(' + (offset / this.size * this.percentage) + '% - ' + this.aGutterSize + 'px)'
+	            this.b.style[dimension] = calc + '(' + (this.percentage - (offset / this.size * this.percentage)) + '% - ' + this.bGutterSize + 'px)'
+	        }
+	      , fitMin = function () {
+	            var self = this
+	              , a = self.a
+	              , b = self.b
+
+	            if (a[getBoundingClientRect]()[dimension] < self.aMin) {
+	                a.style[dimension] = (self.aMin - self.aGutterSize) + 'px'
+	                b.style[dimension] = (self.size - self.aMin - self.aGutterSize) + 'px'
+	            } else if (b[getBoundingClientRect]()[dimension] < self.bMin) {
+	                a.style[dimension] = (self.size - self.bMin - self.bGutterSize) + 'px'
+	                b.style[dimension] = (self.bMin - self.bGutterSize) + 'px'
+	            }
+	        }
+	      , fitMinReverse = function () {
+	            var self = this
+	              , a = self.a
+	              , b = self.b
+
+	            if (b[getBoundingClientRect]()[dimension] < self.bMin) {
+	                a.style[dimension] = (self.size - self.bMin - self.bGutterSize) + 'px'
+	                b.style[dimension] = (self.bMin - self.bGutterSize) + 'px'
+	            } else if (a[getBoundingClientRect]()[dimension] < self.aMin) {
+	                a.style[dimension] = (self.aMin - self.aGutterSize) + 'px'
+	                b.style[dimension] = (self.size - self.aMin - self.aGutterSize) + 'px'
+	            }
+	        }
+	      , balancePairs = function (pairs) {
+	            for (var i = 0; i < pairs.length; i++) {
+	                calculateSizes.call(pairs[i])
+	                fitMin.call(pairs[i])
+	            }
+
+	            for (i = pairs.length - 1; i >= 0; i--) {
+	                calculateSizes.call(pairs[i])
+	                fitMinReverse.call(pairs[i])
+	            }
+	        }
+	      , preventSelection = function () { return false }
+	      , parent = elementOrSelector(ids[0]).parentNode
+
+	    if (!options.sizes) {
+	        var percent = 100 / ids.length
+
+	        options.sizes = []
+
+	        for (i = 0; i < ids.length; i++) {
+	            options.sizes.push(percent)
+	        }
+	    }
+
+	    if (!Array.isArray(options.minSize)) {
+	        var minSizes = []
+
+	        for (i = 0; i < ids.length; i++) {
+	            minSizes.push(options.minSize)
+	        }
+
+	        options.minSize = minSizes
+	    }
+
+	    for (i = 0; i < ids.length; i++) {
+	        var el = elementOrSelector(ids[i])
+	          , isFirst = (i == 1)
+	          , isLast = (i == ids.length - 1)
+	          , size
+	          , gutterSize = options.gutterSize
+	          , pair
+
+	        if (i > 0) {
+	            pair = {
+	                a: elementOrSelector(ids[i - 1]),
+	                b: el,
+	                aMin: options.minSize[i - 1],
+	                bMin: options.minSize[i],
+	                dragging: false,
+	                parent: parent,
+	                isFirst: isFirst,
+	                isLast: isLast,
+	                direction: options.direction
+	            }
+
+	            // For first and last pairs, first and last gutter width is half.
+
+	            pair.aGutterSize = options.gutterSize
+	            pair.bGutterSize = options.gutterSize
+
+	            if (isFirst) {
+	                pair.aGutterSize = options.gutterSize / 2
+	            }
+
+	            if (isLast) {
+	                pair.bGutterSize = options.gutterSize / 2
+	            }
+	        }
+
+	        // IE9 and above
+	        if (!isIE8) {
+	            if (i > 0) {
+	                var gutter = document.createElement('div')
+
+	                gutter.className = gutterClass
+	                gutter.style[dimension] = options.gutterSize + 'px'
+
+	                gutter[addEventListener]('mousedown', startDragging.bind(pair))
+	                gutter[addEventListener]('touchstart', startDragging.bind(pair))
+
+	                parent.insertBefore(gutter, el)
+
+	                pair.gutter = gutter
+	            }
+
+	            if (i === 0 || i == ids.length - 1) {
+	                gutterSize = options.gutterSize / 2
+	            }
+
+	            if (typeof options.sizes[i] === 'string' || options.sizes[i] instanceof String) {
+	                size = options.sizes[i]
+	            } else {
+	                size = calc + '(' + options.sizes[i] + '% - ' + gutterSize + 'px)'
+	            }
+
+	        // IE8 and below
+	        } else {
+	            if (typeof options.sizes[i] === 'string' || options.sizes[i] instanceof String) {
+	                size = options.sizes[i]
+	            } else {
+	                size = options.sizes[i] + '%'
+	            }
+	        }
+
+	        el.style[dimension] = size
+
+	        if (i > 0) {
+	            pairs.push(pair)
+	        }
+	    }
+
+	    balancePairs(pairs)
+	}
+
+	if (true) {
+	    if (typeof module !== 'undefined' && module.exports) {
+	        exports = module.exports = Split
+	    }
+	    exports.Split = Split
+	} else {
+	    global.Split = Split
+	}
+
+	}).call(window)
+
+
+/***/ },
+/* 62 */
+/***/ function(module, exports) {
+
+	module.exports = "<section class=\"nodes\">\n  <figure class='nflow-tree'></figure>\n  <figure class='nflow-timeline'></figure>\n</section>\n<aside class=\"details\">\n  <header></header>\n\n  <section>\n    <input  id='details-pane' type=\"checkbox\" />\n    <label for='details-pane'>Details</label>\n    <dl>\n      <dt>name</dt>\n      <dd>{name}</dd>\n      <dt>id</dt>\n      <dd>{id}</dd>\n      <dt>status</dt>\n      <dd>{status}</dd>\n    </dl>\n  </section>\n  <section>\n    <input  id='data-pane' type=\"checkbox\" />\n    <label for='data-pane'>Data</label>\n    <pre></pre>\n  </section>\n  <section>\n    <input  id='listeners-pane' type=\"checkbox\" />\n    <label for='listeners-pane'>Listeners</label>\n    <div></div>\n  </section>\n  <section>\n    <input  id='child-nodes-pane' type=\"checkbox\" />\n    <label for='child-nodes-pane'>Child Nodes</label>\n    <div></div>\n  </section>\n  <section>\n    <input  id='history-pane' type=\"checkbox\" />\n    <label for='history-pane'>History</label>\n    <div></div>\n  </section>\n\n</aside>\n"
+
+/***/ },
+/* 63 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "panel.html";

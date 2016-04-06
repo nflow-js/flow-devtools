@@ -44,12 +44,15 @@
 /* 0 */
 /***/ function(module, exports, __webpack_require__) {
 
-	__webpack_require__(1);
-	module.exports = __webpack_require__(2);
+	__webpack_require__(4);
+	module.exports = __webpack_require__(5);
 
 
 /***/ },
-/* 1 */
+/* 1 */,
+/* 2 */,
+/* 3 */,
+/* 4 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -58,11 +61,10 @@
 	// chrome.devtools.*
 	// chrome.extension.*
 
-	// Create a tab in the devtools area
 	chrome.devtools.panels.create("Flow", "flow.png", "panel.html", function (panel) {});
 
 /***/ },
-/* 2 */
+/* 5 */
 /***/ function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "devtools.html";

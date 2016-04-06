@@ -1,49 +1,66 @@
-// Chrome automatically creates a background.html page for this to execute.
-// This can access the inspected page via executeScript
-// 
-// Can use:
-// chrome.tabs.*
-// chrome.extension.*
-
-chrome.extension.onConnect.addListener(function (port) {
+// background.js
+var connections = {};
+console.log('nflow-devtools background page is running.')
+chrome.runtime.onConnect.addListener(function (port) {
 
     var extensionListener = function (message, sender, sendResponse) {
 
-        if(message.tabId && message.content) {
-
-                //Evaluate script in inspectedPage
-                if(message.action === 'code') {
-                    chrome.tabs.executeScript(message.tabId, {code: message.content});
-
-                //Attach script to inspectedPage
-                } else if(message.action === 'script') {
-                    chrome.tabs.executeScript(message.tabId, {file: message.content});
-
-                //Pass message to inspectedPage
-                } else {
-                    chrome.tabs.sendMessage(message.tabId, message, sendResponse);
-                }
-
-        // This accepts messages from the inspectedPage and 
-        // sends them to the panel
-        } else {
-            port.postMessage(message);
+        // The original connection event doesn't include the tab ID of the
+        // DevTools page, so we need to send it explicitly.
+        console.log('message from devtools',message)
+        if (message.name == "init") {
+          console.log('nflow devtools tab initialised.')
+          connections[message.tabId] = port;
+          
+          // flush pending messages
+          if (messageCache[message.tabId]) {
+            connections[message.tabId].postMessage({
+              type: 'messages',
+              data: messageCache[message.tabId]
+            });
+            delete messageCache[message.tabId]
+          }
+          return;
         }
-        sendResponse(message);
+
+    // other message handling
     }
 
-    // Listens to messages sent from the panel
-    chrome.extension.onMessage.addListener(extensionListener);
+    // Listen to messages sent from the DevTools page
+    port.onMessage.addListener(extensionListener);
 
     port.onDisconnect.addListener(function(port) {
-        chrome.extension.onMessage.removeListener(extensionListener);
+        port.onMessage.removeListener(extensionListener);
+
+        var tabs = Object.keys(connections);
+        for (var i=0, len=tabs.length; i < len; i++) {
+          if (connections[tabs[i]] == port) {
+            delete connections[tabs[i]]
+            delete messageCache[tabs[i]]
+            break;
+          }
+        }
     });
-
-    // port.onMessage.addListener(function (message) {
-    //     port.postMessage(message);
-    // });
-
 });
+
+var messageCache = {}
+// Receive message from content script and relay to the devTools page for the
+// current tab
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+    //console.log('got message from content page', request, sender)
+    // Messages from content scripts should have sender.tab set
+    if (sender.tab) {
+      var tabId = sender.tab.id;
+      if (tabId in connections) {
+        connections[tabId].postMessage(request);
+      } else {
+        //console.log("Tab not found in connection list, caching messages.");
+        console.log('caching', request.type)
+        if (!messageCache[tabId]) messageCache[tabId] = []
+        messageCache[tabId].push(request)
+      }
+    } else {
+      console.log("sender.tab not defined.");
+    }
     return true;
 });
