@@ -8,10 +8,8 @@ module.exports = {
   entry: {
       'background': './src/background.js'
     , 'devtools': ['./src/devtools.js', './src/devtools.html']
-    , 'inserted-script': './src/inserted-script.js'
-    , 'messageback-script':'./src/messageback-script.js'
-    
-    , 'panel': ['./src/panel.js','./src/panel.html']
+    , 'content-script': './src/site/content-script.js'    
+    , 'panel': ['./src/panel/panel.js','./src/panel/panel.html']
     , 'manifest':'./src/manifest.json'
   },
   output: {
@@ -19,16 +17,26 @@ module.exports = {
     filename: '[name].js',
     //libraryTarget: 'this'
   },
+  resolveLoader: {                                                                                
+    root: path.join(__dirname, 'node_modules')                                                  
+  },  
+  // resolve:{
+  //   alias:{
+  //     'nflow':'nflow/src'
+  //   }
+  // },
+ 
   module: {
-    noparse: [ /nflow-vis/ ],
+    noparse: [ /nflow$/, /nflow-vis/ ],
     loaders: [
-      {
-        test: /\.js$/,
-        exclude: [/node_modules/ , /nflow-vis/],
-        loader: 'babel?presets[]=es2015'
+      { test: /\.js$/
+        , exclude: [/node_modules/, /nflow$/, /nflow-vis/]
+        , loader: 'babel'
+        , query: { presets: ['es2015', 'stage-0'] }
       },
-      { test: /\.css$/, loader: ExtractTextPlugin.extract("style-loader", "css-loader") }  ,
-      { test: /\.(html|json|png)/, loader: 'file?name=[name].[ext]' }
+      { test: /\.(css|scss)$/, loader: ExtractTextPlugin.extract("style-loader", ["css-loader", "sass-loader"]) },
+      { test: /\.(html|json|png)/, loader: 'file?name=[name].[ext]' },
+      { test: /.(png|woff(2)?|eot|ttf|svg)(\?[a-z0-9=\.]+)?$/, loader: 'url-loader?limit=100000' }
     ]
   },
   plugins: [
