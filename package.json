@@ -1,11 +1,15 @@
 {
   "name": "flow-debug",
   "version": "1.0.0",
-  "description": "flow debug Chrome Extension",
+  "description": "nflow debug Chrome Extension",
   "main": "webpack.config.js",
   "scripts": {
+    "start": "webpack-dev-server",
+    "build": "webpack --watch",
+    "pretest": "webpack",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "webpack --watch"
+    "prepublish-to-npm": "webpack",
+    "publish-to-npm": "publish"
   },
   "author": "",
   "license": "ISC",
