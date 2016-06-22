@@ -10,10 +10,9 @@
   }
 
   function post(type, data){
-    var d = window.__nflow_devtools_hook__.serialise(data)
     window.postMessage({
-      type: type,
-      data: d,
+      type,
+      data,
       source: 'nflow-devtools-extension'
     }, '*');
   }

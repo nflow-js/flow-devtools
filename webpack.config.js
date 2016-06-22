@@ -20,19 +20,17 @@ module.exports = {
   resolveLoader: {                                                                                
     root: path.join(__dirname, 'node_modules')                                                  
   },  
-  resolve:{
-    alias:{
-      'nflow':'nflow/src'
-    }
-  },
-  // externals: {
-  //   'nFlow':'nflow'
+  // resolve:{
+  //   alias:{
+  //     'nflow':'nflow/src'
+  //   }
   // },
+ 
   module: {
-    noparse: [ /nflow$/ ],
+    noparse: [ /nflow$/, /nflow-vis/ ],
     loaders: [
       { test: /\.js$/
-        , exclude: [/node_modules/, /nflow$/]
+        , exclude: [/node_modules/, /nflow$/, /nflow-vis/]
         , loader: 'babel'
         , query: { presets: ['es2015', 'stage-0'] }
       },

@@ -5,4 +5,5 @@ import Comms from  './comms.js'
 Comms('nflow-devtools-extension')
   .inject(hook)
   .inject(serialiser)
+  //.onMessage(function(d){  })
   .send('init')

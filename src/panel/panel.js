@@ -8,10 +8,10 @@ import 'nflow-vis/dist/nflow-vis.css'
 import 'font-awesome/scss/font-awesome.scss';
 import './panel.scss'
 import Comms from './comms.js'
-import nflow from 'nflow'
-import {nflowVis} from 'nflow-vis/src'
-import split from 'split.js'
+
 import tpl from 'raw!./content.tpl'
+import 'file?name=[name].[ext]!nflow/dist/nflow.js?'
+import 'file?name=[name].[ext]!nflow-vis/dist/nflow-vis.js?'
 
 var comms = Comms()
 var vis, tree, timeline
@@ -35,14 +35,27 @@ function parseMessage(type, data){
       reset()
       break;
     case 'nflow-log':
-      let d = JSON.parse(data)
-      queue.push(d)
+      queue.push(data)
+      log('')
       maxQueueLength = Math.max(maxQueueLength, queue.length)
       updateQueue()
-      //console.log('visualising', d)
-      
       break;
+    case 'disconnected':
+      log('The nflow Devtools panel has been disconnected from the inspected page. Please <a>refresh</a> the page to reconnect.', true)
+        .select('a')
+        .on('click', ()=>{
+          d3.event.preventDefault()
+          comms.eval('location.reload()')
+      })
+      break;
+   
   }
+}
+
+function log(d, isError){
+  return d3.select('footer>.message')
+    .html(d)
+    .classed('is-error', isError)
 }
 
 function updateQueue(){
@@ -63,7 +76,7 @@ function updateQueue(){
 
     let d = queue.shift()
     
-    vis.emit('action', d.name, d.flow, d.d,d.d0)
+    vis.emit('action', d.action, d.flow, d.d,d.d0)
   }, 1)
 }
 
@@ -77,42 +90,16 @@ updateQueue.clear = function(){
 function reset(){
   queue = []
   updateQueue.clear()
-  d3.select('.content').html(tpl)
-  split(['.nodes', '.details'], {
-      direction: 'horizontal',
-      sizes: [75, 25],
-      minSize: [10, 10],
-      gutterSize: 8,
-      cursor: 'column-resize',
-      snapOffset: 10,
-      onDrag:()=>vis.emit('resize')
-    })
-  
-
-  split(['.nflow-tree', '.nflow-timeline'], {
-      direction: 'vertical',
-      sizes: [75, 25],
-      minSize: [10, 10],
-      snapOffset: 10,
-      gutterSize: 8,
-      cursor: 'row-resize',
-      onDrag:()=>vis.emit('resize')
-    })
-  var d3timeline = d3.select('.nflow-timeline')
-  var d3tree = d3.select('.nflow-tree')
-  
+  var d3vis = d3.select('body').html('').node()
   vis && vis.dispose()
-  vis = nflowVis.Vis()
-  d3.select(window).on('resize.tree', ()=>vis.emit('resize'))
+  vis = nflowVis.Debug()
+  d3.select(window)
+    .on('resize.tree', ()=>vis.emit('resize'))
+  vis
+    .emit.downstream('dom', d3vis)
+    .emit('resize')
 
-
-  tree = nflowVis.Tree(vis)
-  tree.emit.downstream('dom', d3tree.node())
-  tree.emit.downstream('show-events', false)
-  
-  timeline = nflowVis.Timeline(vis)
-  timeline.emit.downstream('dom', d3timeline.node())
-
+  log('Waiting for nflow messages...', true)
 }
 
 reset()
