@@ -67,6 +67,8 @@ function updateQueue(){
     if (!queue.length) {
       maxQueueLength = 0
       updateQueue.clear()
+      var s = vis.emit('get-model').data()
+      vis.emit('update', s)
       return;
     }
     d3progress
@@ -75,7 +77,6 @@ function updateQueue(){
       .attr('value', maxQueueLength-queue.length)
 
     let d = queue.shift()
-    
     vis.emit('action', d.action, d.flow, d.d,d.d0)
   }, 1)
 }

@@ -1,6 +1,6 @@
 {
   "name": "nflow-devtools",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "nflow debug Chrome Extension",
   "main": "webpack.config.js",
   "scripts": {
@@ -20,27 +20,27 @@
     "babel-preset-stage-0": "^6.3.13",
     "chai": "^3.5.0",
     "css-loader": "^0.23.0",
+    "d3": "^3.5.6",
     "extract-text-webpack-plugin": "^0.9.1",
     "file-loader": "^0.8.5",
+    "font-awesome": "^4.5.0",
     "html-loader": "^0.3.0",
     "less": "^2.5.3",
     "less-loader": "^2.2.2",
     "mocha-circleci-reporter": "^0.0.1",
     "mocha-loader": "^0.7.1",
+    "nflow": "^0.2.2",
+    "nflow-vis": "^0.1.5",
+    "node-sass": "^3.8.0",
     "publish": "0.5.0",
     "raw-loader": "^0.5.1",
+    "sass-loader": "^3.2.1",
+    "split.js": "^1.0.6",
     "style-loader": "^0.13.0",
     "text-loader": "0.0.1",
     "url-loader": "^0.5.7",
     "webpack": "^1.12.8",
-    "webpack-dev-server": "^1.12.1",
-    "d3": "^3.5.6",
-    "font-awesome": "^4.5.0",
-    "nflow": "^0.2.2",
-    "nflow-vis": "^0.1.3",
-    "sass-loader": "^3.2.1",
-    "split.js": "^1.0.6"
+    "webpack-dev-server": "^1.12.1"
   },
-  "dependencies": {
-  }
+  "dependencies": {}
 }
