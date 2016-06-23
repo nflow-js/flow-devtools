@@ -1,6 +1,6 @@
 {
   "name": "nflow-debug",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "nflow debug Chrome Extension",
   "main": "webpack.config.js",
   "scripts": {
@@ -33,14 +33,14 @@
     "text-loader": "0.0.1",
     "url-loader": "^0.5.7",
     "webpack": "^1.12.8",
-    "webpack-dev-server": "^1.12.1"
-  },
-  "dependencies": {
+    "webpack-dev-server": "^1.12.1",
     "d3": "^3.5.6",
     "font-awesome": "^4.5.0",
     "nflow": "^0.2.0",
     "nflow-vis": "0.0.1",
     "sass-loader": "^3.2.1",
     "split.js": "^1.0.6"
+  },
+  "dependencies": {
   }
 }
