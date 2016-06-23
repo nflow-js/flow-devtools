@@ -1,5 +1,5 @@
 {
-  "name": "nflow-debug",
+  "name": "nflow-devtools",
   "version": "0.0.2",
   "description": "nflow debug Chrome Extension",
   "main": "webpack.config.js",
